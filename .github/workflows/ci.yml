@@ -1,0 +1,62 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [backend, main]
+  pull_request:
+    branches: [backend, main]
+
+jobs:
+  test:
+    name: Test Django
+    runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SECRET_KEY: ci-secret-key-not-for-production
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Django config
+        run: python manage.py check
+
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+
+      - name: Run tests
+        run: python manage.py test --verbosity=2
+
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t mongez-backend:${{ github.sha }} .
+
+      - name: Smoke test container
+        run: |
+          cp .env.example .env
+          echo "DJANGO_DEBUG=true" >> .env
+          echo "DJANGO_SECRET_KEY=ci-smoke-test" >> .env
+          docker compose up -d
+          sleep 5
+          curl --retry 5 --retry-delay 2 --fail http://localhost:8000/api/auth/login/ -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}' || true
+          docker compose logs web
+          docker compose down
