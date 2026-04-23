@@ -1,26 +1,19 @@
-# ── Backend (Django) ──────────────────────
-backend/__pycache__/
-backend/**/__pycache__/
-backend/*.pyc
-backend/.env
-backend/staticfiles/
-backend/media/
-backend/db.sqlite3
+# Backend
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
+.env
+.venv/
+venv/
+staticfiles/
+media/
 
-# ── Flutter ───────────────────────────────
-mobile/.dart_tool/
-mobile/build/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
-mobile/.packages
-mobile/.pub-cache/
-mobile/.pub/
-mobile/android/captures/
-mobile/android/key.properties
-mobile/*.jks
-mobile/local.properties
+# Local tooling
+.codex
 
-# ── General ───────────────────────────────
+# General
 .DS_Store
 *.log
 .idea/
