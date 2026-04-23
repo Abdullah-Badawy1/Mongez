@@ -111,6 +111,29 @@ class OrderListCreateView(APIView):
         response_data["payment_key"] = payment_key
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+
+class OrderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            order = Order.objects.select_related(
+                "client",
+                "worker",
+                "service_category",
+            ).get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == User.Role.CLIENT and order.client != request.user:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == User.Role.WORKER and order.worker != request.user:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(OrderSerializer(order).data)
+
+
 class OrderAcceptView(APIView):
     permission_classes = [IsAuthenticated]
 

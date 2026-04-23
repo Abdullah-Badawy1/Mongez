@@ -129,7 +129,7 @@ Create or update worker profile body:
 | POST | `/api/orders/<id>/accept/` | Yes, worker | Accept pending order |
 | POST | `/api/orders/<id>/reject/` | Yes, worker | Reject pending order |
 | POST | `/api/orders/<id>/cancel/` | Yes, client | Cancel pending order |
-| POST | `/api/orders/<id>/complete/` | Yes, client | Mark accepted order complete |
+| POST | `/api/orders/<id>/complete/` | Yes, worker | Mark accepted order complete |
 
 Create order body:
 

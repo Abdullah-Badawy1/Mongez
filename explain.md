@@ -123,7 +123,7 @@ JWT authentication is enabled with Simple JWT. Login and registration both retur
 4. Worker accepts or rejects the order.
 5. On accept, the backend attempts to capture the commission.
 6. On reject or cancel, the backend attempts to void the commission hold.
-7. Client can mark accepted work as completed.
+7. Worker can mark accepted work as completed.
 
 ## Mobile Integration Notes
 
@@ -151,4 +151,3 @@ feat(orders): add service order workflow
 chore(config): wire backend apps for deployment
 docs(api): add mobile backend endpoint reference
 ```
-
