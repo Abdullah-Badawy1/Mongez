@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.env
+db.sqlite3
+media/
+staticfiles/
+.git/
+.github/
+docs/
+.claude/
+.codex
+*.md
+*.log
