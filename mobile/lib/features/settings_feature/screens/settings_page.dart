@@ -1,0 +1,97 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mongez/core/bloc/cubit/localization_cubit.dart';
+import 'package:mongez/core/bloc/theme_cubit/theme_cubit.dart';
+import 'package:mongez/generated/l10n.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark =
+        context.watch<ThemeCubit>().state.themeMode == ThemeMode.dark;
+    final currentLocale = context
+        .watch<LocalizationCubit>()
+        .state
+        .locale
+        .languageCode;
+
+    final lang = S.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(lang.settings)),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isDark ? Icons.dark_mode : Icons.light_mode,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      lang.darkMode,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Switch(
+                    value: isDark,
+                    onChanged: (value) {
+                      context.read<ThemeCubit>().setTheme(value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.language,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      lang.language,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: currentLocale,
+                    underline: const SizedBox(),
+                    items: [
+                      DropdownMenuItem(value: 'ar', child: Text(lang.arabic)),
+                      DropdownMenuItem(value: 'en', child: Text(lang.english)),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        context.read<LocalizationCubit>().changeLanguage(value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
