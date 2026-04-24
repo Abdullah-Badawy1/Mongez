@@ -23,6 +23,7 @@ class FavoiriteScreen extends StatelessWidget {
         address: fav.worker.user.address.isNotEmpty
             ? fav.worker.user.address
             : lang.addressMainStreetCairo,
+        workerId: fav.worker.user.id,
       );
 
   @override

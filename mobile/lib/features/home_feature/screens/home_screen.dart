@@ -42,7 +42,7 @@ class _HomeBody extends StatelessWidget {
           '${w.profession} — ${w.experienceYears} years experience. Rating: ${w.averageRating.toStringAsFixed(1)}',
       comments: [lang.greatService, lang.veryProfessional],
       address: w.user.address.isNotEmpty ? w.user.address : lang.addressMainStreetCairo,
-      workerId: w.id,
+      workerId: w.user.id,
       categoryId: categoryId,
     );
   }
