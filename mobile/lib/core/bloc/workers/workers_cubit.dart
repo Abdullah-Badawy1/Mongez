@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mongez/core/api/api_error.dart';
 import 'package:mongez/core/models/category_model.dart';
 import 'package:mongez/core/models/worker_model.dart';
 import 'package:mongez/core/services/worker_service.dart';
@@ -21,7 +22,7 @@ class WorkersCubit extends Cubit<WorkersState> {
         workers: results[1] as List<WorkerModel>,
       ));
     } catch (e) {
-      emit(WorkersError(e.toString()));
+      emit(WorkersError(_msg(e)));
     }
   }
 
@@ -31,9 +32,16 @@ class WorkersCubit extends Cubit<WorkersState> {
     emit(WorkersLoading());
     try {
       final workers = await _service.getWorkers(categoryId: categoryId);
-      emit(WorkersLoaded(categories: cats, workers: workers, selectedCategoryId: categoryId));
+      emit(WorkersLoaded(
+        categories: cats,
+        workers: workers,
+        selectedCategoryId: categoryId,
+      ));
     } catch (e) {
-      emit(WorkersError(e.toString()));
+      emit(WorkersError(_msg(e)));
     }
   }
+
+  String _msg(Object e) =>
+      e is ApiError ? e.message : ApiError.from(e).message;
 }

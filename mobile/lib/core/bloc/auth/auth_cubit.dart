@@ -1,5 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mongez/core/api/api_error.dart';
 import 'package:mongez/core/services/auth_service.dart';
 import 'auth_state.dart';
 
@@ -13,13 +13,14 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await _service.login(username: username, password: password);
       emit(AuthSuccess(user));
-    } on DioException catch (e) {
-      emit(AuthError(_parseError(e)));
+    } catch (e) {
+      emit(AuthError(_message(e)));
     }
   }
 
   Future<void> register({
     required String username,
+    String? email,
     required String phone,
     required String address,
     required String password,
@@ -29,14 +30,15 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await _service.register(
         username: username,
+        email: email,
         phone: phone,
         address: address,
         password: password,
         role: role,
       );
       emit(AuthSuccess(user));
-    } on DioException catch (e) {
-      emit(AuthError(_parseError(e)));
+    } catch (e) {
+      emit(AuthError(_message(e)));
     }
   }
 
@@ -45,8 +47,8 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await _service.getProfile();
       emit(AuthSuccess(user));
-    } on DioException catch (e) {
-      emit(AuthError(_parseError(e)));
+    } catch (e) {
+      emit(AuthError(_message(e)));
     }
   }
 
@@ -55,13 +57,10 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthLoggedOut());
   }
 
-  String _parseError(DioException e) {
-    final data = e.response?.data;
-    if (data is Map) {
-      final first = data.values.first;
-      if (first is List && first.isNotEmpty) return first.first.toString();
-      return first.toString();
-    }
-    return e.message ?? 'An error occurred';
+  /// Services in this app throw [ApiError] on failure (never raw [DioException]),
+  /// but we keep the fallback for any non-API surface that still raises.
+  String _message(Object e) {
+    if (e is ApiError) return e.message;
+    return ApiError.from(e).message;
   }
 }

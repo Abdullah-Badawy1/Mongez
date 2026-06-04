@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mongez/core/api/api_error.dart';
 import 'package:mongez/core/services/order_service.dart';
 import 'orders_state.dart';
 
@@ -13,7 +14,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       final orders = await _service.getOrders();
       emit(OrdersLoaded(orders));
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
 
@@ -27,7 +28,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       emit(OrderActionSuccess('Order placed successfully'));
       await loadOrders();
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
 
@@ -37,7 +38,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       emit(OrderActionSuccess('Order cancelled'));
       await loadOrders();
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
 
@@ -47,7 +48,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       emit(OrderActionSuccess('Order accepted'));
       await loadOrders();
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
 
@@ -57,7 +58,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       emit(OrderActionSuccess('Order rejected'));
       await loadOrders();
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
 
@@ -67,7 +68,10 @@ class OrdersCubit extends Cubit<OrdersState> {
       emit(OrderActionSuccess('Order completed'));
       await loadOrders();
     } catch (e) {
-      emit(OrdersError(e.toString()));
+      emit(OrdersError(_msg(e)));
     }
   }
+
+  String _msg(Object e) =>
+      e is ApiError ? e.message : ApiError.from(e).message;
 }
