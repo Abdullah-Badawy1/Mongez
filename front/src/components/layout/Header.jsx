@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Navbar, Nav, Button, Offcanvas, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import logo from '../../assets/images/a.png';
 
@@ -41,12 +40,6 @@ function Header() {
     { id: 3, nameKey: 'nav_how_it_works', path: '#how-it-works', icon: 'bi-play-circle' },
     { id: 4, nameKey: 'nav_why_choose', path: '#why-choose', icon: 'bi-star' },
     { id: 5, nameKey: 'nav_app', path: '#app', icon: 'bi-phone' },
-  ];
-
-  // Auth buttons (للصفحات الخاصة)
-  const authButtons = [
-    { id: 1, nameKey: 'auth_login', path: '/login', variant: 'outline-primary' },
-    // { id: 2, name: 'Sign Up', path: '/auth/register', variant: 'primary' },
   ];
 
   // Handle navigation to sections

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Container, Row, Col, Button, Image } from 'react-bootstrap';
-import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 function AppPromotion() {

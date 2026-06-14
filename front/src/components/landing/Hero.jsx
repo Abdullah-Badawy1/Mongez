@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Container, Row, Col, Button, Image, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { motion, useAnimation } from 'framer-motion';
+import { useAnimation } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { useTranslation } from 'react-i18next'; // استيراد useTranslation
+import { useTranslation } from 'react-i18next';
 
 function Hero() {
   const { t } = useTranslation(); // استخدام الترجمة

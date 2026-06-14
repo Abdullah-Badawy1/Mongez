@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
-  const { user, loading, initialLoading, hasRole } = useAuth();
+  const { user, loading, initialLoading } = useAuth();
   const location = useLocation();
 
   const storedToken = localStorage.getItem('accessToken');
