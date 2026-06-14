@@ -1,0 +1,419 @@
+@startuml mongez-architecture
+'================================================================
+'  Mongez — Software Architecture
+'
+'  This file is the single PlantUML source for every architecture
+'  diagram of the Mongez platform. Render with:
+'
+'      java -jar plantuml.jar docs/ARCHITECTURE.puml
+'      # or, in VS Code, install "PlantUML" by jebbs and open this file.
+'
+'  Each `@startuml NAME` block below is rendered into its own PNG:
+'    NAME = mongez-architecture        (1) System context
+'           mongez-components          (2) Component / deployment view
+'           mongez-domain              (3) Domain class diagram (DB models)
+'           mongez-flow-login          (4) Sequence: login + role redirect
+'           mongez-flow-order          (5) Sequence: client places an order
+'           mongez-flow-admin          (6) Sequence: admin dashboard load
+'           mongez-states-order        (7) State machine: Order lifecycle
+'================================================================
+
+'----------------------------------------------------------------
+'  1. System context — actors and the three runtime surfaces
+'----------------------------------------------------------------
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam defaultFontName "Inter"
+skinparam ArrowColor #3498db
+skinparam ArrowFontColor #2c3e50
+
+actor "Client"      as client
+actor "Worker\n(technician)" as worker
+actor "Admin"       as admin
+
+rectangle "Mongez Platform" #ecf0f1 {
+  rectangle "Flutter mobile app\n(mobile/)" as mobile #DDF1FA
+  rectangle "React + Vite SPA\n(front/) — landing + admin" as front #DDF1FA
+  rectangle "Django REST API\n(core/)" as api #B6E2F5
+  database  "SQLite\n(db.sqlite3,\nnamed volume)" as db #FFFFFF
+}
+
+cloud "Paymob" as paymob
+cloud "FCM\n(optional)" as fcm
+
+client --> mobile      : place orders\nbrowse workers
+worker --> mobile      : accept/reject/complete\norders
+admin  --> front       : manage everything\n(login + /admin/*)
+mobile --> api         : HTTPS / JSON\nBearer JWT
+front  --> api         : HTTPS / JSON\nBearer JWT  (axios)
+api    --> db          : ORM
+api    --> paymob      : commission\n(authorize/capture/void)
+api    --> fcm         : push (best-effort)
+paymob --> api         : webhook\n(HMAC-verified)
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  2. Component / deployment view
+'----------------------------------------------------------------
+
+@startuml mongez-components
+
+skinparam defaultFontName "Inter"
+skinparam componentStyle rectangle
+skinparam roundCorner 12
+skinparam ArrowColor #3498db
+
+package "Docker container: mongez-backend" #ecf0f1 {
+  component "Gunicorn (2 workers)"       as gunicorn
+  component "entrypoint.sh\n(migrate → exec gunicorn)" as entry
+  package "Django project (core/)" {
+    component "settings.py"               as settings
+    component "urls.py"                   as urls
+    component "middleware\n(CORS, WhiteNoise,\nsecurity, sessions, CSRF)" as mw
+    package "apps/" {
+      component "users"          as a_users
+      component "workers"        as a_workers
+      component "orders"         as a_orders
+      component "payments"       as a_payments
+      component "ratings"        as a_ratings
+      component "favorites"      as a_favorites
+      component "notifications"  as a_notif
+      component "admin_api"      as a_admin
+    }
+  }
+  database  "/app/data/db.sqlite3"  as db_vol
+  folder    "/app/media\n(uploads)" as media_vol
+}
+
+package "Flutter mobile app" #DDF1FA {
+  component "main.dart\nMultiBlocProvider" as m_main
+  component "ApiClient (Dio)\n+ JWT interceptor"  as m_api
+  component "services_locator (GetIt)" as m_di
+  component "features/*\n(auth, home, workers,\norders, favorites, …)" as m_features
+}
+
+package "React dashboard (front/)" #DDF1FA {
+  component "main.jsx" as f_main
+  component "AuthContext\n(JWT in localStorage)" as f_auth
+  component "AppRoutes\n(Protected/PublicRoute)" as f_routes
+  component "pages/admin/*\n(Dashboard, Users,\nWorkers, Orders, …)" as f_admin
+  component "services/api.js\n(axios + refresh)" as f_api
+}
+
+cloud "Firebase Hosting\n(static dist/)" as fb_host
+cloud "Paymob"   as paymob
+cloud "FCM"      as fcm
+
+m_features --> m_api
+m_api      --> gunicorn : Bearer JWT
+f_admin    --> f_api
+f_routes   --> f_auth
+f_api      --> gunicorn : Bearer JWT  (dev: Vite proxy)
+fb_host    --> gunicorn : same-origin /api (prod)
+
+gunicorn --> urls
+urls --> mw
+mw --> a_users
+mw --> a_workers
+mw --> a_orders
+mw --> a_payments
+mw --> a_ratings
+mw --> a_favorites
+mw --> a_notif
+mw --> a_admin
+
+a_users     --> db_vol
+a_workers   --> db_vol
+a_orders    --> db_vol
+a_payments  --> db_vol
+a_ratings   --> db_vol
+a_favorites --> db_vol
+a_notif     --> db_vol
+a_admin     ..> a_users  : reads
+a_admin     ..> a_workers : reads
+a_admin     ..> a_orders  : reads/writes
+a_admin     ..> a_payments: reads
+a_admin     ..> a_ratings : reads
+
+a_orders   ..> media_vol  : attachments
+a_users    ..> media_vol  : avatars
+
+a_payments --> paymob : authorize/capture/void
+paymob     --> a_payments : webhook
+a_notif    --> fcm        : push (optional)
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  3. Domain class diagram
+'----------------------------------------------------------------
+
+@startuml mongez-domain
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 12
+skinparam ArrowColor #3498db
+hide circle
+
+class User {
+  +id : BigAuto
+  +username : str
+  +phone : str (unique)
+  +email : str?
+  +password : hashed
+  +role : "client" | "worker" | "admin"
+  +avatar : Image?
+  +city, governorate, address : str?
+  +name_ar : str?
+  +is_active : bool
+  +date_joined : datetime
+}
+
+class ServiceCategory {
+  +id
+  +name, name_ar : str
+  +description, description_ar : str?
+  +icon : Image?
+  +is_active : bool
+  +ordering : int
+}
+
+class WorkerProfile {
+  +id
+  +description, description_ar : str?
+  +experience_years : int
+  +average_rating : float
+  +completed_jobs : int
+  +accept_rate : float
+  +is_available : bool
+  +is_featured : bool
+  +created_at : datetime
+  +calculate_score() : float
+}
+
+class Order {
+  +id
+  +status : PENDING|ACCEPTED|REJECTED|\n          CANCELLED|COMPLETED
+  +urgency : LOW | NORMAL | HIGH
+  +description : text
+  +address_text : str
+  +latitude, longitude : decimal
+  +scheduled_for : datetime?
+  +commission : decimal
+  +created_at, accepted_at,
+   completed_at, cancelled_at : datetime
+}
+
+class OrderAttachment {
+  +id
+  +file : File
+  +kind : photo | audio
+}
+
+class CommissionPayment {
+  +id
+  +amount : decimal
+  +payment_status : AUTHORIZED|CAPTURED|\n                  VOIDED|FAILED
+  +paymob_transaction_id : str
+  +created_at, updated_at : datetime
+}
+
+class Rating {
+  +id
+  +stars : 1..5
+  +review : text?
+  +created_at : datetime
+}
+
+class Favorite {
+  +id
+  +created_at : datetime
+}
+
+class Notification {
+  +id
+  +title, message : str
+  +notif_type : IN_APP | PUSH
+  +data : json
+  +is_read : bool
+  +created_at : datetime
+}
+
+class DeviceToken {
+  +id
+  +token : str
+  +platform : android | ios | web
+  +is_active : bool
+}
+
+User "1" -- "0..1" WorkerProfile        : worker_profile
+User "1" -- "*"   Order                 : my_orders (client)
+User "1" -- "*"   Order                 : assigned_orders (worker)
+User "1" -- "*"   Rating                : as client / worker
+User "1" -- "*"   Favorite              : as client / worker
+User "1" -- "*"   Notification          : recipient
+User "1" -- "*"   DeviceToken           : owner
+
+WorkerProfile "*" -- "1" ServiceCategory : category
+Order         "*" -- "1" ServiceCategory : service_category
+Order         "1" -- "*" OrderAttachment : attachments
+Order         "1" -- "0..1" CommissionPayment : commission
+Order         "1" -- "0..1" Rating       : rating
+
+Favorite      "*" -- "1" User            : client
+Favorite      "*" -- "1" User            : worker
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  4. Sequence — login + role redirect
+'----------------------------------------------------------------
+
+@startuml mongez-flow-login
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 8
+skinparam SequenceArrowColor #3498db
+skinparam ActorBorderColor  #2c3e50
+
+actor "User" as u
+participant "Dashboard SPA\n(front/)" as ui
+participant "axios api\n(/services/api.js)" as ax
+participant "Django /api/auth/login/" as login
+participant "/api/users/me/"         as me
+participant "AuthContext"            as ctx
+
+u -> ui : enter phone + password
+ui -> ax : POST /api/auth/login/ {phone, password}
+ax -> login : JSON body
+login --> ax : { access, refresh, user }
+ax -> ctx : save access/refresh in localStorage
+ctx -> me : GET /api/users/me/ (Bearer access)
+me --> ctx : { id, role, … }
+alt role == "admin"
+  ctx -> ui : navigate /admin/dashboard
+else role != "admin"
+  ctx -> ui : show "admin access required"
+  ctx -> ax : clear tokens
+end
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  5. Sequence — client places an order
+'----------------------------------------------------------------
+
+@startuml mongez-flow-order
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 8
+skinparam SequenceArrowColor #3498db
+
+actor "Client" as c
+participant "Mobile\n(checkout cubit)"  as m
+participant "ApiClient (Dio)"            as dio
+participant "POST /api/orders/"          as orders
+participant "apps.payments"              as pay
+participant "Paymob"                     as paymob
+participant "apps.notifications"         as notif
+
+c -> m : tap "Place order"
+m -> dio : multipart with photos / audio
+dio -> orders : Bearer JWT
+orders -> pay : create CommissionPayment (AUTHORIZED)
+pay -> paymob : authorize commission
+paymob --> pay : auth id
+orders -> notif : notify(worker, "new order")
+notif -> notif : write Notification row
+notif ->] : (optional) FCM push to worker's devices
+orders --> dio : 201 { order }
+dio --> m : Order
+m -> c : "Waiting for worker to accept"
+
+== Worker accepts ==
+
+participant "Worker mobile" as w
+w -> dio : POST /api/orders/<id>/accept/
+dio -> orders : Bearer JWT
+orders -> pay : capture commission
+pay -> paymob : capture
+paymob --> pay : captured tx id
+orders -> notif : notify(client, "worker accepted")
+orders --> dio : 200 { order }
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  6. Sequence — admin dashboard load
+'----------------------------------------------------------------
+
+@startuml mongez-flow-admin
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 8
+skinparam SequenceArrowColor #3498db
+
+actor "Admin" as a
+participant "Dashboard SPA"          as ui
+participant "axios api"              as ax
+participant "/api/admin/dashboard/"  as ep
+participant "apps.admin_api views"   as views
+participant "Django ORM"             as orm
+database    "SQLite"                 as db
+
+a -> ui : open /admin/dashboard
+ui -> ax : GET /api/admin/dashboard/ (Bearer JWT)
+ax -> ep : HTTPS
+ep -> views : IsAuthenticated + role==ADMIN check
+views -> orm : User.count(role=*)
+views -> orm : Order.count() + group by status
+views -> orm : CommissionPayment.sum(amount where CAPTURED)
+views -> orm : Order.objects.order_by('-created_at')[:10]
+orm -> db   : SQL
+db --> orm  : rows
+views --> ep : JSON
+ep --> ax   : 200 { stats, recent_orders }
+ax --> ui   : populate <StatsCards/> + <Table/>
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  7. State machine — Order lifecycle
+'----------------------------------------------------------------
+
+@startuml mongez-states-order
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 12
+skinparam ArrowColor #3498db
+
+[*] --> PENDING : client POST /orders/
+
+PENDING --> ACCEPTED  : worker POST /orders/<id>/accept/\n+ Paymob CAPTURE
+PENDING --> REJECTED  : worker POST /orders/<id>/reject/\n+ Paymob VOID
+PENDING --> CANCELLED : client POST /orders/<id>/cancel/\n+ Paymob VOID
+
+ACCEPTED --> COMPLETED : worker POST /orders/<id>/complete/\n+ bump worker.completed_jobs
+ACCEPTED --> CANCELLED : client POST /orders/<id>/cancel/
+
+COMPLETED --> [*] : client POST /ratings/ (optional)
+REJECTED  --> [*]
+CANCELLED --> [*]
+
+note right of PENDING
+  status is the only field
+  the **admin_api**
+  PATCH /admin/orders/<id>/status/
+  can set, gated to ADMIN.
+end note
+
+@enduml

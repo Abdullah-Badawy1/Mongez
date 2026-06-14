@@ -4,13 +4,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mongez/core/app_colors.dart';
 
 /// Material 3 theme for Mongez.
-/// Light + dark share the same shape language: 16px radii, soft shadows,
-/// Poppins typography, generous padding inside fields and buttons.
+///
+/// Light + dark share the same shape language and align with the web
+/// surfaces (landing page + admin dashboard):
+///   • Typography : **Inter** (the dashboard's font family,
+///                  `font-family: 'Inter', …` in the custom Django admin
+///                  theme and the React dashboard).
+///   • Radius     : 14 px — slightly softer than the dashboard's 12 px
+///                  to suit thumb-sized touch targets, but visibly the
+///                  same shape language.
+///   • Colors     : pulled from [AppColors], which mirrors
+///                  `--mongez-blue / --mongez-accent / --mongez-dark /
+///                  --mongez-light / --mongez-danger` in
+///                  `front/src/pages/Landing.css`.
 class AppThemes {
   AppThemes._();
 
   // ── Shape / radii ─────────────────────────────────────────────────────
-  static const double _r = 18.0;
+  static const double _r = 14.0;
   static const double _rPill = 999.0;
   static final BorderRadius _radius = BorderRadius.circular(_r);
   static final RoundedRectangleBorder _shape =
@@ -18,46 +29,46 @@ class AppThemes {
 
   // ── Typography ────────────────────────────────────────────────────────
   static TextTheme _textTheme(Color body, Color title) =>
-      GoogleFonts.plusJakartaSansTextTheme().copyWith(
-        displayLarge: GoogleFonts.plusJakartaSans(
+      GoogleFonts.interTextTheme().copyWith(
+        displayLarge: GoogleFonts.inter(
           fontSize: 34, fontWeight: FontWeight.w800, color: title, height: 1.15,
           letterSpacing: -0.5,
         ),
-        displayMedium: GoogleFonts.plusJakartaSans(
+        displayMedium: GoogleFonts.inter(
           fontSize: 28, fontWeight: FontWeight.w800, color: title, height: 1.2,
           letterSpacing: -0.4,
         ),
-        displaySmall: GoogleFonts.plusJakartaSans(
+        displaySmall: GoogleFonts.inter(
           fontSize: 23, fontWeight: FontWeight.w700, color: title, height: 1.25,
           letterSpacing: -0.3,
         ),
-        headlineMedium: GoogleFonts.plusJakartaSans(
+        headlineMedium: GoogleFonts.inter(
           fontSize: 20, fontWeight: FontWeight.w700, color: title,
           letterSpacing: -0.2,
         ),
-        headlineSmall: GoogleFonts.plusJakartaSans(
+        headlineSmall: GoogleFonts.inter(
           fontSize: 18, fontWeight: FontWeight.w700, color: title,
           letterSpacing: -0.1,
         ),
-        titleLarge: GoogleFonts.plusJakartaSans(
+        titleLarge: GoogleFonts.inter(
           fontSize: 17, fontWeight: FontWeight.w700, color: title,
         ),
-        titleMedium: GoogleFonts.plusJakartaSans(
+        titleMedium: GoogleFonts.inter(
           fontSize: 15, fontWeight: FontWeight.w600, color: title,
         ),
-        titleSmall: GoogleFonts.plusJakartaSans(
+        titleSmall: GoogleFonts.inter(
           fontSize: 13, fontWeight: FontWeight.w600, color: title,
         ),
-        bodyLarge: GoogleFonts.plusJakartaSans(
+        bodyLarge: GoogleFonts.inter(
           fontSize: 15, fontWeight: FontWeight.w400, color: body, height: 1.5,
         ),
-        bodyMedium: GoogleFonts.plusJakartaSans(
+        bodyMedium: GoogleFonts.inter(
           fontSize: 14, fontWeight: FontWeight.w400, color: body, height: 1.5,
         ),
-        bodySmall: GoogleFonts.plusJakartaSans(
+        bodySmall: GoogleFonts.inter(
           fontSize: 12, fontWeight: FontWeight.w400, color: body,
         ),
-        labelLarge: GoogleFonts.plusJakartaSans(
+        labelLarge: GoogleFonts.inter(
           fontSize: 14, fontWeight: FontWeight.w700, color: title,
         ),
       );
@@ -167,7 +178,7 @@ class AppThemes {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.inter(
           color: titleColor, fontSize: 18, fontWeight: FontWeight.w600,
         ),
         systemOverlayStyle: statusBarStyle.copyWith(
@@ -193,11 +204,11 @@ class AppThemes {
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: GoogleFonts.plusJakartaSans(
+        hintStyle: GoogleFonts.inter(
           color: scheme.onSurface.withValues(alpha: 0.45),
           fontWeight: FontWeight.w400,
         ),
-        labelStyle: GoogleFonts.plusJakartaSans(
+        labelStyle: GoogleFonts.inter(
           color: scheme.onSurface.withValues(alpha: 0.7),
           fontWeight: FontWeight.w500,
         ),
@@ -219,7 +230,7 @@ class AppThemes {
           borderRadius: _radius,
           borderSide: BorderSide(color: scheme.error, width: 1.6),
         ),
-        errorStyle: GoogleFonts.plusJakartaSans(
+        errorStyle: GoogleFonts.inter(
           color: scheme.error, fontSize: 12, fontWeight: FontWeight.w500,
         ),
       ),
@@ -234,7 +245,7 @@ class AppThemes {
           shadowColor: scheme.primary.withValues(alpha: 0.25),
           minimumSize: const Size.fromHeight(52),
           shape: _shape,
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.inter(
             fontSize: 15, fontWeight: FontWeight.w600,
           ),
         ),
@@ -244,7 +255,7 @@ class AppThemes {
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape: _shape,
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.inter(
             fontSize: 15, fontWeight: FontWeight.w600,
           ),
         ),
@@ -256,7 +267,7 @@ class AppThemes {
           side: BorderSide(color: scheme.primary, width: 1.4),
           minimumSize: const Size.fromHeight(52),
           shape: _shape,
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.inter(
             fontSize: 15, fontWeight: FontWeight.w600,
           ),
         ),
@@ -265,7 +276,7 @@ class AppThemes {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: scheme.primary,
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.inter(
             fontSize: 14, fontWeight: FontWeight.w600,
           ),
           shape: RoundedRectangleBorder(
@@ -279,10 +290,10 @@ class AppThemes {
         selectedColor: scheme.primary,
         disabledColor: scheme.surfaceContainerHighest,
         side: BorderSide(color: dividerColor),
-        labelStyle: GoogleFonts.plusJakartaSans(
+        labelStyle: GoogleFonts.inter(
           color: titleColor, fontSize: 12, fontWeight: FontWeight.w500,
         ),
-        secondaryLabelStyle: GoogleFonts.plusJakartaSans(
+        secondaryLabelStyle: GoogleFonts.inter(
           color: scheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w600,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -298,10 +309,10 @@ class AppThemes {
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: GoogleFonts.plusJakartaSans(
+        selectedLabelStyle: GoogleFonts.inter(
           fontSize: 12, fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+        unselectedLabelStyle: GoogleFonts.inter(
           fontSize: 12, fontWeight: FontWeight.w500,
         ),
       ),
@@ -314,7 +325,7 @@ class AppThemes {
         height: 72,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.plusJakartaSans(
+          return GoogleFonts.inter(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? scheme.primary : iconColor,
@@ -349,7 +360,7 @@ class AppThemes {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.surface,
-        contentTextStyle: GoogleFonts.plusJakartaSans(
+        contentTextStyle: GoogleFonts.inter(
           color: titleColor, fontSize: 14, fontWeight: FontWeight.w500,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -361,10 +372,10 @@ class AppThemes {
         surfaceTintColor: Colors.transparent,
         elevation: 8,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.inter(
           color: titleColor, fontSize: 18, fontWeight: FontWeight.w600,
         ),
-        contentTextStyle: GoogleFonts.plusJakartaSans(
+        contentTextStyle: GoogleFonts.inter(
           color: bodyColor, fontSize: 14, fontWeight: FontWeight.w400,
         ),
       ),
