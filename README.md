@@ -1,6 +1,6 @@
 # Mongez — Home Services Platform
 
-A full-stack home services app built with **Django REST Framework** (backend) and **Flutter** (mobile). Clients can browse workers, place service orders, and track them in real time. Workers receive and manage incoming requests.
+A full-stack home services app with three components: **Django REST Framework** backend, **Flutter** mobile app, and a **React + Vite** web dashboard (landing page + admin console). Clients browse workers, place orders, and track them in real time; workers manage incoming requests; admins manage everything from the browser.
 
 ---
 
@@ -10,6 +10,7 @@ A full-stack home services app built with **Django REST Framework** (backend) an
 |---|---|
 | Backend | Django 4.2, Django REST Framework, SimpleJWT |
 | Mobile | Flutter 3, Dart, BLoC / Cubit, Dio |
+| Dashboard | React 19, Vite 7, React Router 7, react-bootstrap, i18next |
 | Auth | JWT (access + refresh tokens with auto-refresh) |
 | Database | SQLite (default) |
 | Container | Docker + Docker Compose |
@@ -21,25 +22,37 @@ A full-stack home services app built with **Django REST Framework** (backend) an
 
 ```
 Mongez/
-├── core/                        # Django project
+├── core/                          # Django project
 │   ├── settings.py
 │   ├── urls.py
+│   ├── templates/admin/           # Custom Django admin template (branded)
+│   ├── static/admin/css/          # Custom admin theme CSS
 │   └── apps/
-│       ├── users/               # Auth, profiles
-│       ├── workers/             # Worker profiles, categories
-│       ├── orders/              # Service orders lifecycle
-│       ├── notifications/       # In-app notifications
-│       ├── payments/            # Paymob payment integration
-│       ├── ratings/             # Worker ratings
-│       └── favorites/           # Saved workers
-├── mobile/                      # Flutter app
+│       ├── users/                 # Auth, profiles, roles (CLIENT/WORKER/ADMIN)
+│       ├── workers/               # Worker profiles, service categories
+│       ├── orders/                # Service order lifecycle + attachments
+│       ├── notifications/         # In-app + push notifications
+│       ├── payments/              # Paymob commission integration
+│       ├── ratings/               # Worker ratings
+│       ├── favorites/             # Saved workers
+│       └── admin_api/             # REST endpoints for the React dashboard
+├── mobile/                        # Flutter app
 │   └── lib/
-│       ├── core/
-│       │   ├── api/             # Dio client + JWT interceptor
-│       │   ├── models/          # Data models
-│       │   ├── services/        # API service layer
-│       │   └── bloc/            # BLoC cubits + states
-│       └── features/            # Screens by feature
+│       ├── core/                  # Theming, localization, helpers
+│       ├── services/              # Dio client + service locator
+│       ├── errors/                # Failure types
+│       └── features/              # Screens by feature (auth, home,
+│                                  # workers, orders, favorites, …)
+├── front/                         # React + Vite web dashboard
+│   ├── src/
+│   │   ├── pages/                 # Landing, Login, AdminDashboard, …
+│   │   ├── pages/admin/           # Users, Workers, Orders, Categories, …
+│   │   ├── components/            # admin/, auth/, common/, landing/, layout/
+│   │   ├── services/api.js        # axios client → backend /api/
+│   │   ├── context/AuthContext    # JWT session state
+│   │   └── locales/{ar,en}/       # i18next translations
+│   ├── vite.config.js             # dev proxy: /api → 127.0.0.1:8000
+│   └── package.json
 ├── Dockerfile
 ├── docker-compose.yml
 ├── entrypoint.sh
@@ -129,6 +142,25 @@ flutter run -d chrome   # Web browser
 flutter run             # Android / iOS device
 ```
 
+### 6. Run the web dashboard
+
+```bash
+cd front
+cp .env.example .env       # set VITE_ADMIN_URL and optional VITE_OPENROUTER_KEY
+npm install
+npm run dev                # → http://localhost:5173
+```
+
+The dev server proxies `/api` and `/media` to the Django backend on `127.0.0.1:8000`. Sign in with any user marked `role=admin` to reach `/admin` routes.
+
+Production build:
+
+```bash
+npm run build              # static bundle in front/dist/
+# Deploy via Firebase Hosting (firebase.json is already configured):
+# firebase deploy --only hosting
+```
+
 ---
 
 ## API Overview
@@ -150,6 +182,7 @@ Authorization: Bearer <access_token>
 | Notifications | `GET notifications/` `POST notifications/read-all/` |
 | Ratings | `POST ratings/` |
 | Favorites | `GET/POST favorites/` `DELETE favorites/<id>/` |
+| Admin (dashboard) | `GET admin/dashboard/` `GET/POST admin/users/` `GET/PATCH/DELETE admin/users/<id>/` `GET admin/workers/` `GET admin/workers/<id>/` `PATCH/DELETE admin/categories/<id>/` `PATCH admin/orders/<id>/status/` `GET admin/payments/` `GET admin/ratings/` |
 
 Full request/response details: see [`API_links.md`](API_links.md).
 

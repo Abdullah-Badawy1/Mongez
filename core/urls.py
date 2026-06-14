@@ -18,6 +18,7 @@ api_patterns = [
     path("", include("apps.payments.urls")),
     path("", include("apps.ratings.urls")),
     path("", include("apps.favorites.urls")),
+    path("", include("apps.admin_api.urls")),
 ]
 
 urlpatterns = [

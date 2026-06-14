@@ -1,9 +1,10 @@
 # Mongez — Complete Project Reference (`all.md`)
 
 > One document that explains the entire system: where data lives, how the
-> backend is shaped, how the mobile app talks to it, how Docker glues it all
-> together, and what each piece is for. Read top-to-bottom for the full
-> picture; jump to a section if you only need one part.
+> backend is shaped, how the mobile app and the web dashboard talk to it,
+> how Docker glues it all together, and what each piece is for. Read
+> top-to-bottom for the full picture; jump to a section if you only need
+> one part.
 
 ---
 
@@ -16,7 +17,7 @@ end users and one platform operator:
 |---|---|
 | **Client** | Browses workers by category, places a service order, pays the worker in cash on-site, then rates the worker. |
 | **Worker** (technician) | Lists themselves under a profession (Plumbing, Electrical, etc.), receives incoming orders, accepts/rejects them, and marks them complete. |
-| **Admin** | Uses the Django admin to manage categories, users, orders, and payments. |
+| **Admin** | Signs into the React dashboard (`front/`) to manage categories, users, workers, orders, payments, and ratings. The branded Django admin at `/admin/` remains as a power-user fallback. |
 
 The platform itself earns a **flat commission per accepted order**
 (`COMMISSION_AMOUNT`, default 20 EGP). Workers and clients still exchange
@@ -43,7 +44,30 @@ Mongez/
 │       ├── notifications/    · In-app rows + FCM device tokens
 │       ├── payments/         · Paymob commission + webhook
 │       ├── ratings/          · Post-job star ratings
-│       └── favorites/        · Saved workers per client
+│       ├── favorites/        · Saved workers per client
+│       └── admin_api/        · REST endpoints consumed by the React dashboard
+├── core/templates/admin/     ← Custom Django admin theme (branding/extrastyle)
+├── core/static/admin/css/    ← Custom admin theme CSS (Tailwind-ish tokens)
+├── front/                    ← React + Vite web dashboard (landing + admin)
+│   ├── index.html · vite.config.js (dev proxy → 127.0.0.1:8000)
+│   ├── firebase.json         · Firebase Hosting config (dist/)
+│   ├── package.json          · React 19, react-router 7, react-bootstrap, i18next, axios, framer-motion
+│   └── src/
+│       ├── main.jsx · App.jsx
+│       ├── i18n.js · locales/{ar,en}/translation.json
+│       ├── services/api.js          · axios client + JWT auto-refresh
+│       ├── context/AuthContext.jsx  · session state + token storage
+│       ├── routes/                  · AppRoutes, ProtectedRoute, PublicRoute
+│       ├── pages/                   · LandingPage, Login, ResetPassword, NotFound
+│       │   └── admin/               · Dashboard, Users, Workers, Categories,
+│       │                             Orders, Payments, Ratings
+│       └── components/
+│           ├── landing/             · Hero, Services, HowItWorks, WhyChoose,
+│           │                          AppPromotion, EmergencySection, Chat
+│           ├── admin/               · Sidebar, Topbar, StatsCards, Table, AdminLayout
+│           ├── auth/LoginPage.jsx
+│           ├── common/              · Button, Loader, ChatWidget
+│           └── layout/              · Header, Footer, Layout
 ├── mobile/                   ← Flutter app (separate sub-project)
 │   └── lib/
 │       ├── main.dart                · App entry, MultiBlocProvider, startup auth check
@@ -84,8 +108,9 @@ Mongez/
 └── PROJECT_OVERVIEW.md · ENHANCEMENTS.md · DOCKER_VERIFICATION.md · CLOUD_SERVICES.md
 ```
 
-`lastversion/` is a snapshot of the previous mobile codebase and is **not
-used by the running app**. The working app is everything under `mobile/`.
+The working mobile app is everything under `mobile/`. The working
+dashboard is everything under `front/` (built artifacts in `front/dist/`
+are produced by `npm run build` and deployable as a static SPA).
 
 ---
 
@@ -111,16 +136,20 @@ called server-side. The mobile app only talks to the backend.
 Data flow at a glance:
 
 ```
-                   ┌──────────────────────────────────────────┐
-                   │              Flutter mobile              │
-                   │  (Dio + JWT interceptor + PrefHelper)    │
-                   └──────────────────────────────────────────┘
-                              │ HTTPS/HTTP JSON
-                              ▼
+   ┌──────────────────────┐   ┌────────────────────────────┐
+   │   Flutter mobile     │   │  React dashboard (front/)  │
+   │   (Dio + JWT)        │   │  (axios + JWT, react-router│
+   │   clients & workers  │   │  admin/landing routes)     │
+   └──────────────────────┘   └────────────────────────────┘
+              │ HTTPS/HTTP JSON         │ HTTPS/HTTP JSON
+              └─────────────┬───────────┘
+                            ▼
                    ┌──────────────────────────────────────────┐
                    │  Django REST API   /api/...              │
                    │  Gunicorn (2 workers) inside Docker      │
-                   │  apps/users · workers · orders · ...     │
+                   │  apps/users · workers · orders · ratings │
+                   │  payments · notifications · favorites    │
+                   │  admin_api    ← powers the dashboard     │
                    └──────────────────────────────────────────┘
                               │            │
                   ┌───────────┘            └──────────────┐
@@ -344,6 +373,38 @@ mechanism today (no websockets).
 - `DELETE /api/favorites/<id>/` or `DELETE /api/favorites/worker/<worker_id>/`
   for a toggle-by-worker-id shortcut.
 
+### 4.9 `apps/admin_api` — REST endpoints for the dashboard
+
+Plain `APIView` classes, all gated by `IsAuthenticated` + a runtime
+`request.user.role != User.Role.ADMIN` check (so a leaked client token
+can't reach them). No models of its own — it reads/writes through the
+other apps' models and serializers.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET    | `/api/admin/dashboard/`              | Aggregate stats (counts by role, by status), revenue sum, last 10 orders |
+| GET    | `/api/admin/users/?search=&role=&page=&page_size=` | Paginated user list (Q over username/phone/email) |
+| POST   | `/api/admin/users/create/`           | Create user via `RegisterSerializer` |
+| GET/PATCH/DELETE | `/api/admin/users/<pk>/`   | Read, partial-update (whitelisted fields), delete |
+| PATCH/DELETE | `/api/admin/categories/<pk>/`   | Edit / remove a `ServiceCategory` |
+| GET    | `/api/admin/payments/`               | Flat list of `CommissionPayment` rows |
+| PATCH  | `/api/admin/orders/<pk>/status/`     | Set order status (validates against `Order.STATUS_CHOICES`; auto-stamps `accepted_at` / `completed_at` / `cancelled_at`; bumps `worker.completed_jobs` on completion) |
+| GET    | `/api/admin/workers/?search=&page=&page_size=` | Paginated worker list with profile join + computed score |
+| GET    | `/api/admin/workers/<pk>/`           | Single worker profile detail |
+| GET    | `/api/admin/ratings/`                | All ratings (most recent first) |
+
+These power every screen under `front/src/pages/admin/`. They're plain
+JSON over the same `/api/` mount and the same JWT auth — the dashboard
+re-uses the regular login endpoints.
+
+Beyond the REST layer, the app also ships a **custom Django admin
+theme** at `core/templates/admin/base_site.html` +
+`core/static/admin/css/custom_admin.css` — the legacy `/admin/` URL is
+still wired up and now renders in the Mongez brand colors with an
+Arabic-friendly footer. Picked up automatically because
+`STATICFILES_DIRS` and `TEMPLATES.DIRS` point at `core/static` and
+`core/templates` in `core/settings.py`.
+
 ---
 
 ## 5. Mobile — Flutter app
@@ -481,9 +542,107 @@ The single most involved flow. Tracing a client tapping **"Book Now"**:
 
 ---
 
-## 6. Docker — what the box actually does
+## 6. Dashboard — React + Vite web app (`front/`)
 
-### 6.1 `Dockerfile`
+The dashboard is two products sharing a single SPA:
+
+1. **Public landing page** — marketing site (Hero, Services, How it works,
+   Why-choose, AppPromotion, Emergency, Chat widget). Bilingual via
+   `i18next` with `ar` and `en` JSON dictionaries in `src/locales/`.
+2. **Admin console** — gated routes under `/admin/*` that hit
+   `apps.admin_api` endpoints.
+
+### 6.1 Stack
+
+| Concern | Choice |
+|---|---|
+| Build | Vite 7 (`npm run dev` / `npm run build`) |
+| UI | React 19, react-bootstrap, framer-motion, bootstrap-icons |
+| Routing | react-router-dom 7 (`AppRoutes`, `ProtectedRoute`, `PublicRoute`) |
+| Data | axios via `src/services/api.js` with JWT auto-refresh |
+| Session | `src/context/AuthContext.jsx` → access/refresh in `localStorage` |
+| i18n | `react-i18next` + `src/i18n.js` |
+| Hosting | Firebase Hosting (`firebase.json` rewrites everything to `index.html`) |
+
+### 6.2 Layout
+
+```
+front/src/
+├── main.jsx · App.jsx · i18n.js
+├── services/api.js        ← axios instance, baseURL='/api'
+│                            request interceptor injects Bearer token,
+│                            response interceptor refreshes on 401 then retries
+├── context/AuthContext    ← {user, login, logout, isAuthenticated, isAdmin}
+├── routes/
+│   ├── AppRoutes.jsx      ← <Routes> tree
+│   ├── ProtectedRoute.jsx ← redirects to /login if no token
+│   └── PublicRoute.jsx    ← redirects authed admins to /admin
+├── pages/
+│   ├── LandingPage.jsx + Landing.css    ← marketing site
+│   ├── Login.jsx · ResetPassword.jsx · NotFound.jsx
+│   ├── AdminDashboard.jsx               ← stats home
+│   └── admin/
+│       ├── Dashboard.jsx · Users.jsx · Workers.jsx
+│       ├── Categories.jsx · Orders.jsx · Payments.jsx · Ratings.jsx
+├── components/
+│   ├── landing/   (Hero, Services, HowItWorks, WhyChoose, AppPromotion,
+│   │              EmergencySection, Chat)
+│   ├── admin/     (AdminLayout, Sidebar, Topbar, StatsCards, Table)
+│   ├── auth/LoginPage.jsx
+│   ├── common/    (Button, Loader, ChatWidget)
+│   └── layout/    (Header, Footer, Layout)
+├── styles/        (admin.css, global.css)
+└── locales/{ar,en}/translation.json
+```
+
+### 6.3 Dev workflow
+
+```bash
+cd front
+cp .env.example .env       # VITE_ADMIN_URL, VITE_OPENROUTER_KEY
+npm install
+npm run dev                # http://localhost:5173 with HMR
+```
+
+The Vite dev server proxies `/api` and `/media` to the Django backend at
+`http://127.0.0.1:8000`, so the browser only talks to `localhost:5173`
+during development — no CORS dance.
+
+### 6.4 Production build & deploy
+
+```bash
+npm run build              # writes front/dist/
+firebase deploy --only hosting     # (firebase.json points at dist/)
+```
+
+`dist/index.html` references hashed JS/CSS bundles. The `firebase.json`
+rewrites every unknown path to `index.html` so the SPA router takes
+over.
+
+### 6.5 How the dashboard talks to the backend
+
+- Login → `POST /api/auth/login/` (same endpoint the mobile app uses)
+- After login the SPA stores the JWT pair and pings `GET /api/users/me/`
+  to verify the role is `admin`. If not, it logs out and shows an
+  error.
+- All admin screens consume `apps.admin_api` endpoints listed in §4.9.
+- Media (e.g. user avatars in tables) is served from the Django
+  `/media/` mount.
+
+### 6.6 Custom Django admin theme
+
+A separate, lower-fidelity admin still lives at `/admin/` (Django's
+built-in). It now extends `core/templates/admin/base_site.html` and
+loads `core/static/admin/css/custom_admin.css`, giving the legacy admin
+the same Mongez branding (purple/indigo palette, Inter font, Arabic
+title). Useful as a fallback or for power-user models the React
+dashboard doesn't expose.
+
+---
+
+## 7. Docker — what the box actually does
+
+### 7.1 `Dockerfile`
 
 - Base: `python:3.12-slim`.
 - Installs `libjpeg62-turbo zlib1g` (Pillow), `curl` (for the
@@ -500,7 +659,7 @@ The single most involved flow. Tracing a client tapping **"Book Now"**:
   grace.
 - `ENTRYPOINT ["/app/entrypoint.sh"]`.
 
-### 6.2 `entrypoint.sh`
+### 7.2 `entrypoint.sh`
 
 Runs briefly as root, then drops to `app` via `gosu`:
 
@@ -514,7 +673,7 @@ Runs briefly as root, then drops to `app` via `gosu`:
 `exec` matters: Gunicorn replaces the shell so it becomes PID 1's
 direct child and receives `SIGTERM` cleanly on `docker stop`.
 
-### 6.3 `docker-compose.yml`
+### 7.3 `docker-compose.yml`
 
 ```yaml
 services:
@@ -539,21 +698,21 @@ volumes:
 Two named volumes intentionally separate from the source tree. `docker
 compose down` keeps them. `docker compose down -v` wipes them.
 
-### 6.4 `.dockerignore`
+### 7.4 `.dockerignore`
 
 Trims the build context: drops `venv/`, `__pycache__/`, `.git/`,
 `.env`, the existing `db.sqlite3`, `media/`, `staticfiles/`, **the
 entire `mobile/` directory**, docs, and IDE/OS files. The image only
 contains what's needed to serve the API.
 
-### 6.5 `.env`
+### 7.5 `.env`
 
 `.env.example` lists every supported variable. Required for production:
 `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=false`, `DJANGO_ALLOWED_HOSTS`.
 Paymob and FCM keys can stay blank in dev — both integrations are no-ops
 when their secrets are missing.
 
-### 6.6 Operational commands
+### 7.6 Operational commands
 
 ```bash
 docker compose up -d --build        # build + start in background
@@ -575,7 +734,7 @@ curl http://localhost:8000/api/workers/       # paginated empty list
 
 ---
 
-## 7. Where backend and mobile actually connect
+## 8. Where backend, mobile, and dashboard actually connect
 
 There's no shared code — the contract is the JSON over HTTP:
 
@@ -603,13 +762,24 @@ There's no shared code — the contract is the JSON over HTTP:
    in dev unless `FCM_SERVER_KEY` is set.
 6. **File uploads** use `multipart/form-data`: avatars during register,
    order photos (`photos`) and audio (`audio`).
+7. **Dashboard sends** the same `Authorization: Bearer <access>` header.
+   In dev, requests go through Vite's proxy
+   (`front/vite.config.js` → `/api → http://127.0.0.1:8000`) so the
+   browser only ever sees `localhost:5173`. In production, serve the
+   built `front/dist/` from the same origin as the API (or set
+   `CORS_ALLOWED_ORIGINS` and host them separately).
+8. **Admin gating** is double-checked: `apps.admin_api` views require
+   `IsAuthenticated` **and** `request.user.role == User.Role.ADMIN`.
+   A non-admin token gets `403 Admin access required.` so dashboard
+   `ProtectedRoute` + `AuthContext.isAdmin` only matters for UX, not
+   security.
 
 ---
 
-## 8. Branch layout (matters for collaborators)
+## 9. Branch layout (matters for collaborators)
 
-- `main` — production-ready snapshot of backend + mobile + fixes (current
-  branch).
+- `main` — production-ready snapshot of backend + mobile + dashboard +
+  fixes (current branch).
 - `backend` — historical: backend-only.
 - `mobile` — historical: mobile-only.
 - `test` — integration testing branch that merges backend + mobile.
@@ -619,7 +789,7 @@ The memory note from previous sessions says **don't push directly to
 
 ---
 
-## 9. Quick reference — every endpoint
+## 10. Quick reference — every endpoint
 
 ```
 Auth
@@ -676,21 +846,45 @@ Favorites
   DELETE/api/favorites/<id>/                        client
   DELETE/api/favorites/worker/<worker_id>/          client
 
+Admin (used by the React dashboard — admin role only)
+  GET    /api/admin/dashboard/                      admin
+  GET    /api/admin/users/?search=&role=&page=&page_size=    admin
+  POST   /api/admin/users/create/                   admin
+  GET    /api/admin/users/<id>/                     admin
+  PATCH  /api/admin/users/<id>/                     admin
+  DELETE /api/admin/users/<id>/                     admin
+  PATCH  /api/admin/categories/<id>/                admin
+  DELETE /api/admin/categories/<id>/                admin
+  GET    /api/admin/payments/                       admin
+  PATCH  /api/admin/orders/<id>/status/             admin
+  GET    /api/admin/workers/?search=&page=&page_size= admin
+  GET    /api/admin/workers/<id>/                   admin
+  GET    /api/admin/ratings/                        admin
+
 Misc
   GET   /api/health/                                public (used by HEALTHCHECK)
-  /admin/                                           Django admin
+  /admin/                                           Django admin (custom Mongez theme)
 ```
 
 ---
 
-## 10. TL;DR
+## 11. TL;DR
 
-- **Backend** is a Django REST API split into 7 apps under `core/apps/`,
-  authenticated with JWT, throttled per-endpoint, served by Gunicorn
-  inside a Docker container that auto-applies migrations on boot.
+- **Backend** is a Django REST API split into 8 apps under `core/apps/`
+  (users, workers, orders, notifications, payments, ratings, favorites,
+  admin_api), authenticated with JWT, throttled per-endpoint, served by
+  Gunicorn inside a Docker container that auto-applies migrations on
+  boot.
 - **Mobile** is a Flutter app under `mobile/` that talks to that API via
   a Dio client with a JWT interceptor; state lives in feature-scoped
   cubits registered globally; repositories return `Either<Failure, T>`.
+- **Dashboard** is a React 19 + Vite SPA under `front/` (landing page +
+  admin console). It calls the same `/api/` mount the mobile uses, plus
+  the new `/api/admin/*` endpoints in `apps.admin_api`. Deployable as a
+  static bundle via Firebase Hosting (`firebase.json`).
+- **Custom Django admin theme** lives in `core/templates/admin/` and
+  `core/static/admin/css/`, picked up via `TEMPLATES.DIRS` and
+  `STATICFILES_DIRS` in `core/settings.py`.
 - **Data** is SQLite plus an uploads directory, both kept on named
   Docker volumes so they survive rebuilds.
 - **Paymob** is the only external dependency in the order flow, and only
@@ -698,6 +892,7 @@ Misc
   void on reject/cancel. Webhook updates statuses.
 - **Push** is via FCM if `FCM_SERVER_KEY` is set; otherwise in-app rows
   only, polled by the mobile every 30 s.
-- **Connection point** between mobile and backend is exactly one URL
-  (`ApiConstants.baseUrl`) plus the `Authorization: Bearer …` header —
-  change the URL per target, keep the contract identical.
+- **Connection points** are all REST/JSON: mobile uses
+  `ApiConstants.baseUrl`; dashboard uses Vite's dev proxy (`/api`) or
+  same-origin when deployed behind the same host. Same JWT contract
+  everywhere.
