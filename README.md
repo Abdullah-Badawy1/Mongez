@@ -303,6 +303,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 * Generic step-by-step guide: [INSTALL.md](INSTALL.md)
 * Windows-specific guide:     [WINDOWS.md](WINDOWS.md)
 * Architecture & UML diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+* Step-by-step testing playbook: [TESTING.md](TESTING.md)
 
 ---
 
