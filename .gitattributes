@@ -1,0 +1,29 @@
+# Default — let Git decide based on content.
+* text=auto
+
+# Shell scripts MUST be LF, even when checked out on Windows. entrypoint.sh
+# runs inside the Linux container; CRLF would break the shebang.
+*.sh        text eol=lf
+*.bash      text eol=lf
+entrypoint.sh text eol=lf
+start.sh    text eol=lf
+
+# PowerShell stays CRLF on Windows.
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Always-binary types — never apply text normalization.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       text
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.otf       binary
+*.sqlite3   binary
+*.zip       binary
+*.rar       binary

@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
-# Mongez — one-shot launcher.
+# Mongez — one-shot launcher for the whole platform.
+#
+# What it can run:
+#   • Backend     — Django REST API in Docker      (always, unless --stop/--down/--status)
+#   • Dashboard   — React + Vite dev server        (--dashboard, runs in background)
+#   • Mobile      — `flutter run` against backend  (--mobile, foreground)
 #
 # Usage:
-#   ./start.sh                    # build (if needed), start, wait healthy, print info
+#   ./start.sh                    # build (if needed), start backend, wait healthy, print info
 #   ./start.sh --rebuild          # force a clean image rebuild
 #   ./start.sh --seed             # also create test accounts (client1/worker1/admin1)
+#   ./start.sh --dashboard        # also start the React dashboard (front/) on :5173
 #   ./start.sh --mobile           # also `flutter run` the mobile app afterwards
+#   ./start.sh --all              # = --seed --dashboard --mobile  (full local stack)
 #   ./start.sh --logs             # follow `docker compose logs` after starting
-#   ./start.sh --stop             # stop the stack (keep volumes)
+#   ./start.sh --stop             # stop backend + dashboard (keep volumes)
 #   ./start.sh --down             # stop + wipe volumes (DESTROYS DB and uploads)
 #   ./start.sh --status           # show container + health status and exit
 #
-# Flags can be combined, e.g.  ./start.sh --rebuild --seed --logs
+# Flags can be combined, e.g.  ./start.sh --rebuild --seed --dashboard --logs
 
 set -euo pipefail
 
@@ -26,6 +33,13 @@ CONTAINER_NAME="mongez-backend"
 HEALTH_URL="http://localhost:8000/api/health/"
 WORKERS_URL="http://localhost:8000/api/workers/"
 ADMIN_URL="http://localhost:8000/admin/"
+
+DASHBOARD_DIR="front"
+DASHBOARD_ENV_FILE="$DASHBOARD_DIR/.env"
+DASHBOARD_ENV_EXAMPLE="$DASHBOARD_DIR/.env.example"
+DASHBOARD_PID_FILE=".dashboard.pid"
+DASHBOARD_LOG_FILE=".dashboard.log"
+DASHBOARD_URL="http://localhost:5173/"
 
 # ── Colors (no-op when not a TTY) ────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -44,6 +58,7 @@ die()   { fail "$*"; exit 1; }
 # ── Flag parsing ─────────────────────────────────────────────────────────────
 DO_REBUILD=0
 DO_SEED=0
+DO_DASHBOARD=0
 DO_MOBILE=0
 DO_LOGS=0
 DO_STOP=0
@@ -52,15 +67,17 @@ DO_STATUS=0
 
 for arg in "$@"; do
   case "$arg" in
-    --rebuild) DO_REBUILD=1 ;;
-    --seed)    DO_SEED=1    ;;
-    --mobile)  DO_MOBILE=1  ;;
-    --logs)    DO_LOGS=1    ;;
-    --stop)    DO_STOP=1    ;;
-    --down)    DO_DOWN=1    ;;
-    --status)  DO_STATUS=1  ;;
+    --rebuild)   DO_REBUILD=1 ;;
+    --seed)      DO_SEED=1 ;;
+    --dashboard) DO_DASHBOARD=1 ;;
+    --mobile)    DO_MOBILE=1 ;;
+    --all)       DO_SEED=1; DO_DASHBOARD=1; DO_MOBILE=1 ;;
+    --logs)      DO_LOGS=1 ;;
+    --stop)      DO_STOP=1 ;;
+    --down)      DO_DOWN=1 ;;
+    --status)    DO_STATUS=1 ;;
     -h|--help)
-      sed -n '2,16p' "$0"
+      sed -n '2,21p' "$0"
       exit 0
       ;;
     *)
@@ -68,6 +85,20 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+# ── Helpers shared by lifecycle paths ────────────────────────────────────────
+stop_dashboard() {
+  if [ -f "$DASHBOARD_PID_FILE" ]; then
+    pid="$(cat "$DASHBOARD_PID_FILE")"
+    if kill -0 "$pid" 2>/dev/null; then
+      step "Stopping dashboard dev server (pid=$pid)..."
+      # Vite spawns a child esbuild process — kill the whole group.
+      kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+      ok "Dashboard stopped."
+    fi
+    rm -f "$DASHBOARD_PID_FILE"
+  fi
+}
 
 # ── Prereqs ──────────────────────────────────────────────────────────────────
 command -v docker >/dev/null 2>&1 || die "docker is not installed or not on PATH"
@@ -80,6 +111,7 @@ if [ "$DO_STATUS" = 1 ]; then
 fi
 if [ "$DO_STOP" = 1 ]; then
   step "Stopping stack (volumes preserved)..."
+  stop_dashboard
   docker compose down
   ok "Stopped."
   exit 0
@@ -88,6 +120,7 @@ if [ "$DO_DOWN" = 1 ]; then
   printf "%sThis will DELETE the database and uploaded files.%s\n" "$C_WARN" "$C_RST"
   read -r -p "Type 'yes' to confirm: " ans
   [ "$ans" = "yes" ] || { warn "Aborted."; exit 1; }
+  stop_dashboard
   docker compose down -v
   ok "Stopped and wiped."
   exit 0
@@ -194,12 +227,58 @@ PY
   ok "Seed complete."
 fi
 
+# ── Optional: launch dashboard (Vite dev server) ─────────────────────────────
+DASHBOARD_RUNNING=0
+if [ "$DO_DASHBOARD" = 1 ]; then
+  if [ ! -d "$DASHBOARD_DIR" ]; then
+    warn "$DASHBOARD_DIR/ not found — skipping --dashboard."
+  elif ! command -v npm >/dev/null 2>&1; then
+    warn "npm not on PATH — install Node 18+ then re-run with --dashboard."
+  else
+    # .env bootstrap for the dashboard
+    if [ ! -f "$DASHBOARD_ENV_FILE" ] && [ -f "$DASHBOARD_ENV_EXAMPLE" ]; then
+      step "Creating $DASHBOARD_ENV_FILE from $DASHBOARD_ENV_EXAMPLE..."
+      cp "$DASHBOARD_ENV_EXAMPLE" "$DASHBOARD_ENV_FILE"
+    fi
+
+    # If a previous run left a dev server alive, reuse it instead of doubling.
+    if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 "$(cat "$DASHBOARD_PID_FILE")" 2>/dev/null; then
+      ok "Dashboard already running (pid=$(cat "$DASHBOARD_PID_FILE")) — skipping launch."
+      DASHBOARD_RUNNING=1
+    else
+      step "Installing dashboard dependencies (idempotent)..."
+      ( cd "$DASHBOARD_DIR" && npm install --no-audit --no-fund --silent )
+      step "Starting dashboard dev server (Vite) in background → $DASHBOARD_LOG_FILE"
+      # setsid puts the dev server in its own process group so we can later
+      # signal the whole group (Vite + esbuild child) with kill -- -PID.
+      ( cd "$DASHBOARD_DIR" && setsid npm run dev >"../$DASHBOARD_LOG_FILE" 2>&1 ) &
+      echo "$!" > "$DASHBOARD_PID_FILE"
+      # Wait up to ~30 s for Vite to print "Local:".
+      for _ in $(seq 1 60); do
+        if grep -q "Local:" "$DASHBOARD_LOG_FILE" 2>/dev/null; then
+          break
+        fi
+        sleep 0.5
+      done
+      if curl --silent --fail "$DASHBOARD_URL" >/dev/null; then
+        ok "Dashboard responding at $DASHBOARD_URL"
+        DASHBOARD_RUNNING=1
+      else
+        warn "Dashboard dev server didn't answer in time. Tail $DASHBOARD_LOG_FILE for details."
+      fi
+    fi
+  fi
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf "\n%s================ Mongez is up ================%s\n" "$C_HL" "$C_RST"
 printf "  API:     %shttp://localhost:8000/api/%s\n"      "$C_OK" "$C_RST"
 printf "  Health:  %s%s%s\n"                              "$C_OK" "$HEALTH_URL" "$C_RST"
 printf "  Workers: %s%s%s\n"                              "$C_OK" "$WORKERS_URL" "$C_RST"
 printf "  Admin:   %s%s%s\n"                              "$C_OK" "$ADMIN_URL"   "$C_RST"
+if [ "$DASHBOARD_RUNNING" = 1 ]; then
+  printf "  Dashboard: %s%s%s\n"                          "$C_OK" "$DASHBOARD_URL" "$C_RST"
+fi
 if [ "$DO_SEED" = 1 ]; then
   printf "\n  Test accounts:\n"
   printf "    client : %sclient1 / ClientPass123%s\n" "$C_OK" "$C_RST"
@@ -208,10 +287,13 @@ if [ "$DO_SEED" = 1 ]; then
 fi
 printf "%s===============================================%s\n" "$C_HL" "$C_RST"
 printf "%sNotes:%s\n" "$C_DIM" "$C_RST"
-printf "  • Stop:        ./start.sh --stop\n"
+printf "  • Stop:        ./start.sh --stop      (stops backend + dashboard)\n"
 printf "  • Wipe data:   ./start.sh --down\n"
 printf "  • Rebuild:     ./start.sh --rebuild\n"
-printf "  • Logs:        docker compose logs -f web\n"
+printf "  • Backend logs: docker compose logs -f web\n"
+if [ "$DASHBOARD_RUNNING" = 1 ]; then
+  printf "  • Dashboard logs: tail -f %s\n" "$DASHBOARD_LOG_FILE"
+fi
 printf "  • Android emu: change mobile baseUrl to http://10.0.2.2:8000/api/\n\n"
 
 # ── Optional: launch mobile ──────────────────────────────────────────────────

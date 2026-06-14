@@ -230,7 +230,47 @@ ports:
 
 ---
 
-## Useful Commands
+## One-shot launchers
+
+The repo ships two launchers that wrap the whole platform — backend
+container, React dashboard (Vite dev server), and the Flutter mobile
+app — behind a single command.
+
+### Linux / macOS (`start.sh`)
+
+```bash
+./start.sh                       # backend only
+./start.sh --all                 # backend + dashboard + mobile + seed accounts
+./start.sh --seed --dashboard    # backend + dashboard, seeded
+./start.sh --rebuild             # force a clean image rebuild
+./start.sh --stop                # stop backend + dashboard (volumes preserved)
+./start.sh --down                # stop + WIPE database/uploads
+./start.sh --status              # docker compose ps
+./start.sh --logs                # follow backend logs
+./start.sh --help                # print all flags
+```
+
+### Windows (`start.ps1`)
+
+```powershell
+./start.ps1                      # backend only
+./start.ps1 -All                 # backend + dashboard + mobile + seed accounts
+./start.ps1 -Seed -Dashboard     # backend + dashboard, seeded
+./start.ps1 -Rebuild             # force a clean image rebuild
+./start.ps1 -Stop                # stop backend + dashboard
+./start.ps1 -Down                # stop + WIPE database/uploads
+./start.ps1 -Status              # docker compose ps
+./start.ps1 -FollowLogs          # follow backend logs
+Get-Help ./start.ps1 -Detailed   # full parameter help
+```
+
+For a complete Windows porting walkthrough (WSL2, Docker Desktop,
+Node, Flutter, line-ending hygiene, troubleshooting) see
+[**WINDOWS.md**](WINDOWS.md).
+
+---
+
+## Useful manual commands (no launcher)
 
 ```bash
 # Backend
@@ -238,6 +278,10 @@ docker compose up -d                         # start in background
 docker compose down                          # stop
 docker compose logs -f web                   # stream logs
 docker compose exec web python manage.py shell
+
+# Dashboard
+cd front && npm install && npm run dev       # dev server on :5173
+cd front && npm run build                    # production bundle in front/dist
 
 # Mobile
 flutter pub get                              # install packages
@@ -256,7 +300,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Installation
 
-For a detailed step-by-step setup guide see [INSTALL.md](INSTALL.md).
+* Generic step-by-step guide: [INSTALL.md](INSTALL.md)
+* Windows-specific guide:     [WINDOWS.md](WINDOWS.md)
+* Architecture & UML diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 

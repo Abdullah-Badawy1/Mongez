@@ -18,6 +18,10 @@ dashboard.rar
 lastversion/
 _dashboard_unpack/
 
+# Launcher runtime artifacts (start.sh / start.ps1)
+.dashboard.pid
+.dashboard.log
+
 # Frontend (dashboard React app)
 front/node_modules/
 front/dist/
