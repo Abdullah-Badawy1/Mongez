@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ordersAPI, adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const statusColors = {
   PENDING: { bg: '#f59e0b20', color: '#f59e0b' },
@@ -14,37 +15,44 @@ const statusColors = {
 
 const allStatuses = ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'WAITING_CONFIRMATION', 'REJECTED', 'CANCELLED', 'COMPLETED'];
 
+const fetchOrders = () =>
+  ordersAPI.list({ page_size: 100 }).then((res) => {
+    // /api/orders/ returns a paginated {results} shape for clients/workers
+    // and a flat array for admin (DRF's default queryset filter). Handle
+    // both so the page works for everyone who gets here.
+    const data = res.data;
+    return Array.isArray(data) ? data : (data?.results || []);
+  });
+
 const Orders = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [changingStatus, setChangingStatus] = useState(null);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await ordersAPI.list({ page_size: 100 });
-      setOrders(res.data?.results || []);
-    } catch {
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // 10 s — Orders is the most dynamic admin surface; we want a new mobile
+  // order or an accept-from-worker to land in the UI within ten seconds.
+  const { data: orders, loading, lastUpdatedAt, refresh, setData } =
+    usePolling(fetchOrders, { intervalMs: 10_000, initialData: [] });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = useCallback(async (orderId, newStatus) => {
     setChangingStatus(orderId);
+    // Optimistic update — flip the row immediately so the admin sees the
+    // change land. If the API rejects, revert by re-fetching from server.
+    const previous = orders;
+    setData((current) => current.map((o) =>
+      o.id === orderId ? { ...o, status: newStatus } : o,
+    ));
     try {
       await adminAPI.orders.updateStatus(orderId, newStatus);
-      fetchOrders();
+      // Pick up server-side side-effects (timestamps, worker.completed_jobs).
+      refresh();
     } catch (err) {
+      setData(previous);
       alert(err.response?.data?.error || 'Failed to update order status');
     } finally {
       setChangingStatus(null);
     }
-  };
+  }, [orders, setData, refresh]);
 
   const filteredOrders = statusFilter ? orders.filter((o) => o.status === statusFilter) : orders;
 
@@ -106,12 +114,19 @@ const Orders = () => {
 
   return (
     <div>
-      <div className="page-header d-flex justify-content-between align-items-center">
+      <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h4 className="mb-1">Orders Management</h4>
           <p className="mb-0">View, filter, and change order statuses.</p>
         </div>
-        <div>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
           <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ borderRadius: '10px', padding: '8px 14px', minWidth: '180px' }}>
             <option value="">All Statuses</option>
             {allStatuses.map((s) => (

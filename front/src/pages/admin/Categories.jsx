@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { categoriesAPI, adminAPI } from '../../services/api';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+
+const fetchCategories = () => categoriesAPI.list().then((res) => res.data || []);
 
 const Categories = () => {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCat, setEditingCat] = useState(null);
   const [form, setForm] = useState({ name: '', image: null });
@@ -11,19 +12,11 @@ const Categories = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formError, setFormError] = useState(null);
 
-  const fetchCategories = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await categoriesAPI.list();
-      setCategories(res.data || []);
-    } catch {
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  // 60 s — categories are basically static; we just want them to refresh
+  // automatically if another admin adds one in a parallel session.
+  const { data: categories, loading, lastUpdatedAt, refresh } =
+    usePolling(fetchCategories, { intervalMs: 60_000, initialData: [] });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const openAdd = () => {
     setEditingCat(null);
@@ -54,7 +47,7 @@ const Categories = () => {
         await categoriesAPI.create(payload);
       }
       setShowModal(false);
-      fetchCategories();
+      refresh();
     } catch (err) {
       console.error('Submit error:', err);
       if (err.response?.data) {
@@ -84,7 +77,7 @@ const Categories = () => {
     try {
       await adminAPI.categories.delete(deleteTarget.id);
       setDeleteTarget(null);
-      fetchCategories();
+      refresh();
     } catch {
       alert('Failed to delete category. Make sure no workers are assigned to it.');
     }
@@ -92,14 +85,23 @@ const Categories = () => {
 
   return (
     <div>
-      <div className="page-header d-flex justify-content-between align-items-center">
+      <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h4 className="mb-1">Categories Management</h4>
           <p className="mb-0">Manage service categories for workers.</p>
         </div>
-        <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#10b981', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
-          <i className="bi bi-plus-lg"></i> Add Category
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+          <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#10b981', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
+            <i className="bi bi-plus-lg"></i> Add Category
+          </button>
+        </div>
       </div>
 
       <div className="card border-0 shadow-sm" style={{ borderRadius: '15px' }}>

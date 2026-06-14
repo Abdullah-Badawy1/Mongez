@@ -1,24 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+
+const fetchRatings = () => adminAPI.ratings.list().then((res) => res.data || []);
 
 const Ratings = () => {
-  const [ratings, setRatings] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRatings = async () => {
-      try {
-        const res = await adminAPI.ratings.list();
-        setRatings(res.data || []);
-      } catch {
-        setRatings([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRatings();
-  }, []);
+  // 30 s — ratings only land at order-complete time, so we don't need a
+  // tight loop here.
+  const { data: ratings, loading, lastUpdatedAt, refresh } =
+    usePolling(fetchRatings, { intervalMs: 30_000, initialData: [] });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const columns = [
     { key: 'id', label: 'Rating #' },
@@ -59,9 +51,20 @@ const Ratings = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h4 className="mb-1">Ratings & Reviews</h4>
-        <p className="mb-0">View all ratings and reviews left by clients.</p>
+      <div className="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h4 className="mb-1">Ratings & Reviews</h4>
+          <p className="mb-0">View all ratings and reviews left by clients.</p>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+        </div>
       </div>
 
       <div className="row g-4 mb-4">

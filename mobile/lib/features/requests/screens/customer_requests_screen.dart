@@ -6,8 +6,27 @@ import 'package:mongez/features/orders/presentation/widgets/order_card.dart';
 import 'package:mongez/generated/l10n.dart';
 import 'package:mongez/widgets/custom_app_bar.dart';
 
-class RequistesScreen extends StatelessWidget {
+class RequistesScreen extends StatefulWidget {
   const RequistesScreen({super.key});
+
+  @override
+  State<RequistesScreen> createState() => _RequistesScreenState();
+}
+
+class _RequistesScreenState extends State<RequistesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Start a 30 s background poll so a dashboard or worker status flip
+    // shows up here without a manual pull-to-refresh.
+    context.read<CustomerOrdersCubit>().startPolling();
+  }
+
+  @override
+  void dispose() {
+    context.read<CustomerOrdersCubit>().stopPolling();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

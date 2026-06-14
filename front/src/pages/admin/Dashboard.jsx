@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import StatsCards from '../../components/admin/StatsCards';
 import { adminAPI } from '../../services/api';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const quickLinks = [
   { path: '/admin/users', label: 'Manage Users', icon: 'bi-people', color: '#6366f1', desc: 'View and manage all system users' },
@@ -22,26 +23,17 @@ const statusColors = {
   COMPLETED: '#10b981',
 };
 
-const Dashboard = () => {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [recentOrders, setRecentOrders] = useState([]);
+const fetchDashboard = () => adminAPI.dashboard().then((res) => res.data);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await adminAPI.dashboard();
-        const data = res.data;
-        setStats(data.stats);
-        setRecentOrders(data.recent_orders || []);
-      } catch {
-        setStats(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+const Dashboard = () => {
+  // Live-poll the dashboard aggregate every 10 s so admins see mobile
+  // activity (new orders, status changes) without manual refresh.
+  const { data, loading, lastUpdatedAt, refresh } =
+    usePolling(fetchDashboard, { intervalMs: 10_000 });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
+
+  const stats = data?.stats || null;
+  const recentOrders = data?.recent_orders || [];
 
   const statCards = stats ? {
     users: stats.total_users,
@@ -56,9 +48,26 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h4 className="mb-1">Dashboard</h4>
-        <p className="mb-0">Welcome back! Here is an overview of your system.</p>
+      <div className="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h4 className="mb-1">Dashboard</h4>
+          <p className="mb-0">Welcome back! Here is an overview of your system.</p>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={refresh}
+            disabled={loading}
+            title="Refresh now"
+          >
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+        </div>
       </div>
 
       <StatsCards stats={statCards} loading={loading} />

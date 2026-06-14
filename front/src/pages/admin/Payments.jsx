@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const paymentColors = {
   AUTHORIZED: { bg: '#3b82f620', color: '#3b82f6' },
@@ -9,23 +10,14 @@ const paymentColors = {
   FAILED: { bg: '#ef444420', color: '#ef4444' },
 };
 
-const Payments = () => {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
+const fetchPayments = () => adminAPI.payments.list().then((res) => res.data || []);
 
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const res = await adminAPI.payments.list();
-        setPayments(res.data || []);
-      } catch {
-        setPayments([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPayments();
-  }, []);
+const Payments = () => {
+  // 15 s — Paymob webhooks land out-of-band; this is roughly how often we
+  // want the admin to see CAPTURE/FAILED transitions catch up.
+  const { data: payments, loading, lastUpdatedAt, refresh } =
+    usePolling(fetchPayments, { intervalMs: 15_000, initialData: [] });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const columns = [
     { key: 'id', label: 'Payment #' },
@@ -65,9 +57,20 @@ const Payments = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h4 className="mb-1">Payments Management</h4>
-        <p className="mb-0">Monitor all commission payment transactions.</p>
+      <div className="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h4 className="mb-1">Payments Management</h4>
+          <p className="mb-0">Monitor all commission payment transactions.</p>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+        </div>
       </div>
 
       <div className="row g-4 mb-4">

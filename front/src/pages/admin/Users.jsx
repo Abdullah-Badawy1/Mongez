@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { adminAPI } from '../../services/api';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const roleColors = {
   admin: { bg: '#ef444420', color: '#ef4444' },
@@ -10,12 +11,9 @@ const roleColors = {
 const emptyForm = { username: '', phone: '', email: '', password: '', role: 'client', address: '', is_active: true };
 
 const Users = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -25,24 +23,26 @@ const Users = () => {
 
   const pageSize = 15;
 
+  // The fetcher captures the current filter values; usePolling resets its
+  // timer when the fetcher reference changes, which is exactly what we
+  // want when search / role / page change.
   const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { page, page_size: pageSize };
-      if (search) params.search = search;
-      if (roleFilter) params.role = roleFilter;
-      const res = await adminAPI.users.list(params);
-      setUsers(res.data.results);
-      setTotal(res.data.count);
-    } catch {
-      setUsers([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
+    const params = { page, page_size: pageSize };
+    if (search) params.search = search;
+    if (roleFilter) params.role = roleFilter;
+    const res = await adminAPI.users.list(params);
+    return { results: res.data.results, count: res.data.count };
   }, [page, search, roleFilter]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  // 30 s — admins rarely watch the user list move; refresh is cheap when
+  // filter or page changes, otherwise let the user reach for the button.
+  const { data, loading, lastUpdatedAt, refresh } = usePolling(fetchUsers, {
+    intervalMs: 30_000,
+    initialData: { results: [], count: 0 },
+  });
+  const users = data?.results || [];
+  const total = data?.count || 0;
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   useEffect(() => { setPage(1); }, [search, roleFilter]);
 
@@ -83,7 +83,7 @@ const Users = () => {
         await adminAPI.users.create(form);
       }
       setShowModal(false);
-      fetchUsers();
+      refresh();
     } catch (err) {
       console.error('Submit error:', err);
       if (err.response?.data) {
@@ -113,7 +113,7 @@ const Users = () => {
     try {
       await adminAPI.users.delete(deleteTarget.id);
       setDeleteTarget(null);
-      fetchUsers();
+      refresh();
     } catch {
       alert('Failed to delete user');
     }
@@ -124,7 +124,7 @@ const Users = () => {
     if (!window.confirm(`Are you sure you want to ${action} user "${user.username}"?`)) return;
     try {
       await adminAPI.users.update(user.id, { is_active: !user.is_active });
-      fetchUsers();
+      refresh();
     } catch {
       alert('Failed to update user status');
     }
@@ -132,14 +132,23 @@ const Users = () => {
 
   return (
     <div>
-      <div className="page-header d-flex justify-content-between align-items-center">
+      <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h4 className="mb-1">Users Management</h4>
           <p className="mb-0">Add, edit, and manage all system users.</p>
         </div>
-        <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#6366f1', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
-          <i className="bi bi-plus-lg"></i> Add User
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+          <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#6366f1', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
+            <i className="bi bi-plus-lg"></i> Add User
+          </button>
+        </div>
       </div>
 
       <div className="card border-0 shadow-sm" style={{ borderRadius: '15px' }}>

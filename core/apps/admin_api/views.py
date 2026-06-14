@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from rest_framework.views import APIView
@@ -20,6 +21,10 @@ def admin_only(request):
         return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
 
 
+_DASHBOARD_STATS_CACHE_KEY = "admin_api:dashboard_stats:v1"
+_DASHBOARD_STATS_TTL = 5  # seconds
+
+
 class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -27,38 +32,43 @@ class AdminDashboardView(APIView):
         if request.user.role != User.Role.ADMIN:
             return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
 
-        total_users = User.objects.count()
-        total_clients = User.objects.filter(role=User.Role.CLIENT).count()
-        total_workers = User.objects.filter(role=User.Role.WORKER).count()
-        total_categories = ServiceCategory.objects.count()
-        total_orders = Order.objects.count()
-        total_payments = CommissionPayment.objects.count()
-        captured_payments = CommissionPayment.objects.filter(payment_status=CommissionPayment.CAPTURED)
-        total_revenue = captured_payments.aggregate(Sum("amount"))["amount__sum"] or 0
+        # Stats aggregate is identical for every admin so we cache it for a
+        # few seconds. The dashboard polls every 10 s; with 5 s TTL the
+        # query runs at most ~every other poll regardless of how many
+        # admins are viewing. The cache is read-through — first request
+        # after expiry takes the hit and warms it back up.
+        stats = cache.get(_DASHBOARD_STATS_CACHE_KEY)
+        if stats is None:
+            captured_payments = CommissionPayment.objects.filter(
+                payment_status=CommissionPayment.CAPTURED,
+            )
+            stats = {
+                "total_users": User.objects.count(),
+                "total_clients": User.objects.filter(role=User.Role.CLIENT).count(),
+                "total_workers": User.objects.filter(role=User.Role.WORKER).count(),
+                "total_categories": ServiceCategory.objects.count(),
+                "total_orders": Order.objects.count(),
+                "total_payments": CommissionPayment.objects.count(),
+                "total_revenue": captured_payments.aggregate(Sum("amount"))["amount__sum"] or 0,
+                "orders_by_status": list(
+                    Order.objects.values("status")
+                    .annotate(count=Count("id"))
+                    .order_by("status"),
+                ),
+            }
+            cache.set(_DASHBOARD_STATS_CACHE_KEY, stats, _DASHBOARD_STATS_TTL)
 
-        orders_by_status = (
-            Order.objects.values("status")
-            .annotate(count=Count("id"))
-            .order_by("status")
-        )
-
-        recent_orders = Order.objects.select_related("client", "worker", "service_category").order_by("-created_at")[:10]
+        # Recent orders are not cached — they're per-request shape (URLs in
+        # serializer depend on `request`) and we always want them fresh.
+        recent_orders = Order.objects.select_related(
+            "client", "worker", "service_category",
+        ).order_by("-created_at")[:10]
         from apps.orders.serializers import OrderSerializer
-        orders_data = OrderSerializer(recent_orders, many=True, context={"request": request}).data
+        orders_data = OrderSerializer(
+            recent_orders, many=True, context={"request": request},
+        ).data
 
-        return Response({
-            "stats": {
-                "total_users": total_users,
-                "total_clients": total_clients,
-                "total_workers": total_workers,
-                "total_categories": total_categories,
-                "total_orders": total_orders,
-                "total_payments": total_payments,
-                "total_revenue": total_revenue,
-                "orders_by_status": orders_by_status,
-            },
-            "recent_orders": orders_data,
-        })
+        return Response({"stats": stats, "recent_orders": orders_data})
 
 
 class AdminUserListView(APIView):

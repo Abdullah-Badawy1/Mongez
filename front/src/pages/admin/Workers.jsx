@@ -1,28 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
+import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const Workers = () => {
-  const [workers, setWorkers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedWorker, setSelectedWorker] = useState(null);
 
   const fetchWorkers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { page_size: 50 };
-      if (search) params.search = search;
-      const res = await adminAPI.workers.list(params);
-      setWorkers(res.data?.results || []);
-    } catch {
-      setWorkers([]);
-    } finally {
-      setLoading(false);
-    }
+    const params = { page_size: 50 };
+    if (search) params.search = search;
+    const res = await adminAPI.workers.list(params);
+    return res.data?.results || [];
   }, [search]);
 
-  useEffect(() => { fetchWorkers(); }, [fetchWorkers]);
+  // 30 s — worker profiles change slowly (rating updates, availability).
+  const { data: workers, loading, lastUpdatedAt, refresh } =
+    usePolling(fetchWorkers, { intervalMs: 30_000, initialData: [] });
+  const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const viewDetail = async (worker) => {
     try {
@@ -104,15 +99,24 @@ const Workers = () => {
 
   return (
     <div>
-      <div className="page-header d-flex justify-content-between align-items-center">
+      <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h4 className="mb-1">Workers Management</h4>
           <p className="mb-0">View all registered workers and their details.</p>
         </div>
-        <div style={{ maxWidth: '300px', width: '100%' }}>
-          <div className="input-group" style={{ borderRadius: '10px', overflow: 'hidden' }}>
-            <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
-            <input type="text" className="form-control border-start-0" placeholder="Search workers..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ padding: '8px 12px' }} />
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            {updatedLabel ? `Updated ${updatedLabel}` : 'Loading…'}
+          </span>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
+            <i className="bi bi-arrow-repeat"></i>
+          </button>
+          <div style={{ maxWidth: '300px', width: '100%' }}>
+            <div className="input-group" style={{ borderRadius: '10px', overflow: 'hidden' }}>
+              <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
+              <input type="text" className="form-control border-start-0" placeholder="Search workers..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ padding: '8px 12px' }} />
+            </div>
           </div>
         </div>
       </div>
