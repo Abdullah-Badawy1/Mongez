@@ -14,6 +14,8 @@ from apps.orders.models import Order
 from apps.payments.models import CommissionPayment
 from apps.ratings.models import Rating
 from apps.ratings.serializers import RatingSerializer
+from apps.notifications.services import notify
+from apps.notifications.models import Notification
 
 
 def admin_only(request):
@@ -218,6 +220,7 @@ class AdminOrderStatusView(APIView):
         if new_status not in valid_statuses:
             return Response({"error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        previous_status = order.status
         order.status = new_status
         now = timezone.now()
         if new_status == Order.ACCEPTED and not order.accepted_at:
@@ -232,6 +235,30 @@ class AdminOrderStatusView(APIView):
         elif new_status == Order.CANCELLED and not order.cancelled_at:
             order.cancelled_at = now
         order.save()
+
+        # Fan out to the affected client (and worker, if assigned) so the
+        # mobile sees the dashboard action immediately via the notification
+        # poll + the order-list poll, instead of only via the order poll.
+        # We mark it PUSH so FCM fires too when FCM_SERVER_KEY is set.
+        if previous_status != new_status:
+            payload = {
+                "order_id": order.id,
+                "status": new_status,
+                "changed_by": "admin",
+            }
+            title = f"Order #{order.id} — {new_status.lower()}"
+            message = f"An administrator updated your order to {new_status}."
+            if order.client_id:
+                notify(
+                    order.client, title, message,
+                    notif_type=Notification.PUSH, data=payload,
+                )
+            if order.worker_id and order.worker_id != order.client_id:
+                notify(
+                    order.worker, title,
+                    f"An administrator updated this order to {new_status}.",
+                    notif_type=Notification.PUSH, data=payload,
+                )
 
         from apps.orders.serializers import OrderSerializer
         return Response(OrderSerializer(order, context={"request": request}).data)
