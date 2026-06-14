@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Container, Row, Col, Button, Image, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { useAnimation } from 'framer-motion';
+// eslint-disable-next-line no-unused-vars -- `motion` used as <motion.*> in JSX (lowercase, missed by no-unused-vars)
+import { motion, useAnimation } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { useTranslation } from 'react-i18next';
 

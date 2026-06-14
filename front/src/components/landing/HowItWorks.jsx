@@ -1,5 +1,7 @@
 import React from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
+// eslint-disable-next-line no-unused-vars -- used as <motion.*> in JSX (lowercase, missed by no-unused-vars)
+import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { useTranslation } from 'react-i18next';
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Navbar, Nav, Button, Offcanvas, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars -- used as <motion.*> in JSX (lowercase, missed by no-unused-vars)
+import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import logo from '../../assets/images/a.png';
 
