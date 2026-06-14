@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.validators import RegexValidator
 from rest_framework import serializers
+from .governorates import GOVERNORATE_CODES
 from .models import User
 
 
@@ -32,14 +33,25 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
-    # Mark optional fields explicitly — DRF infers required=True for
-    # model CharFields even when `blank=True` is set, which used to
-    # send a misleading "this field is required" back to the mobile.
+    # Optional fields kept explicit so DRF doesn't infer required=True
+    # from the model's CharField default.
     email = serializers.EmailField(required=False, allow_blank=True)
     name_ar = serializers.CharField(required=False, allow_blank=True, max_length=120)
     address = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    governorate = serializers.CharField(required=False, allow_blank=True, max_length=20)
     city = serializers.CharField(required=False, allow_blank=True, max_length=80)
+    # Governorate is REQUIRED on register (UX rule — every Egyptian
+    # account has a home governorate). Accepts only the 27 codes from
+    # apps.users.governorates so we don't accumulate typos like
+    # "Kairo" / "El-Iskandariya" in production data.
+    governorate = serializers.ChoiceField(
+        choices=[(code, code) for code in GOVERNORATE_CODES],
+        required=True,
+        error_messages={
+            "required": "Please pick your governorate.",
+            "invalid_choice": "Unknown governorate code. "
+                              "Pick one from /api/governorates/.",
+        },
+    )
     # Override the username field to replace Django's default
     # UnicodeUsernameValidator — its message ("letters, numbers, and
     # @/./+/-/_") is opaque to end-users. Our two validators surface

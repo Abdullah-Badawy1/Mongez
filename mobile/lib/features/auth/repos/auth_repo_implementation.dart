@@ -50,6 +50,8 @@ class AuthRepoImplementation implements AuthRepo {
     required String password,
     required String phone,
     required String role,
+    required String governorate,
+    String city = "",
     String address = "",
     Uint8List? profileImageBytes,
   }) async {
@@ -62,10 +64,10 @@ class AuthRepoImplementation implements AuthRepo {
         "password": password,
         "phone": phone,
         "role": role,
+        "governorate": governorate,
       };
-      if (address.isNotEmpty) {
-        body["address"] = address;
-      }
+      if (city.isNotEmpty) body["city"] = city;
+      if (address.isNotEmpty) body["address"] = address;
 
       late Map<String, dynamic> data;
 

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/features/account/screens/add_service_screen.dart';
 import 'package:mongez/features/auth/bloc/register_cubit/register_cubit.dart';
+import 'package:mongez/features/auth/models/governorate.dart';
+import 'package:mongez/features/auth/repos/governorates_repo.dart';
 import 'package:mongez/generated/l10n.dart';
 import 'package:mongez/services/navigation_service.dart';
+import 'package:mongez/services/services_locator.dart';
 import 'package:mongez/widgets/custom_button.dart';
 import 'package:mongez/widgets/custom_text_form_field.dart';
 import 'package:mongez/widgets/logo.dart';
@@ -26,18 +29,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // display name so users can pick the friendly form for both.
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
+  // City / area — free text (e.g. "Nasr City", "Maadi") on top of the
+  // structured governorate dropdown below.
+  final TextEditingController cityController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   String _selectedRole = 'client';
+  Governorate? _selectedGovernorate;
+
+  // Cached on the page so a rebuild from setState doesn't re-hit
+  // /api/governorates/ — the repo also caches but this skips even the
+  // Either-unwrap.
+  late Future<List<Governorate>> _governoratesFuture;
 
   static final RegExp _usernameRegex = RegExp(r'^[A-Za-z0-9_.@+\-]+$');
+
+  @override
+  void initState() {
+    super.initState();
+    _governoratesFuture = _loadGovernorates();
+  }
+
+  Future<List<Governorate>> _loadGovernorates() async {
+    final result = await getIt<GovernoratesRepo>().getGovernorates();
+    return result.fold(
+      (failure) => throw Exception(failure.errorMessage),
+      (list) => list,
+    );
+  }
 
   @override
   void dispose() {
     nameController.dispose();
     usernameController.dispose();
     phoneController.dispose();
-    addressController.dispose();
+    cityController.dispose();
     passwordController.dispose();
     super.dispose();
   }
@@ -185,22 +210,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    /// Address Field — optional on the backend, but UX
-                    /// asks for it so workers and clients have something
-                    /// the dashboard can show.
+                    /// Governorate dropdown — required. Hydrated from
+                    /// the backend /api/governorates/ so the list stays
+                    /// in one place. Shows the Arabic name with English
+                    /// in subtitle for the typical bilingual user.
+                    FutureBuilder<List<Governorate>>(
+                      future: _governoratesFuture,
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 18),
+                            child: LinearProgressIndicator(),
+                          );
+                        }
+                        if (snap.hasError) {
+                          return InkWell(
+                            onTap: () => setState(() {
+                              _governoratesFuture = _loadGovernorates();
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: colorScheme.errorContainer.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.refresh, color: colorScheme.error),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      "Couldn't load governorates — tap to retry",
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.error,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        final govs = snap.data ?? const <Governorate>[];
+                        return DropdownButtonFormField<Governorate>(
+                          initialValue: _selectedGovernorate,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            hintText: 'Governorate / المحافظة',
+                            prefixIcon: Icon(
+                              Icons.map_outlined,
+                              color: textTheme.bodySmall?.color,
+                            ),
+                          ),
+                          items: govs
+                              .map(
+                                (g) => DropdownMenuItem<Governorate>(
+                                  value: g,
+                                  child: Text(
+                                    '${g.nameAr} · ${g.nameEn}',
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (g) => setState(() => _selectedGovernorate = g),
+                          validator: (g) => g == null
+                              ? 'Please pick your governorate'
+                              : null,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    /// City / Area — free text (e.g. "Nasr City", "Maadi").
+                    /// Optional, but most users fill it.
                     CustomFormField(
-                      controller: addressController,
-                      hintText: lang.address,
+                      controller: cityController,
+                      hintText: 'City / Area (optional)',
                       preIcon: Icon(
-                        Icons.location_on,
+                        Icons.location_city_outlined,
                         color: textTheme.bodySmall?.color,
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your address';
-                        }
-                        return null;
-                      },
+                      validator: (_) => null,
                     ),
                     const SizedBox(height: 20),
 
@@ -231,14 +322,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : CustomButton(
                             text: lang.register,
                             onPressed: () {
-                              if (_formKey.currentState!.validate()) {
+                              if (_formKey.currentState!.validate() &&
+                                  _selectedGovernorate != null) {
                                 cubit.register(
                                   userName: usernameController.text.trim(),
                                   name: nameController.text.trim(),
                                   password: passwordController.text.trim(),
-                                  address: addressController.text.trim(),
                                   phone: phoneController.text.trim(),
                                   role: _selectedRole,
+                                  governorate: _selectedGovernorate!.code,
+                                  city: cityController.text.trim(),
                                 );
                               }
                             },

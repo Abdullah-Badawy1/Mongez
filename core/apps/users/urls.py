@@ -11,4 +11,6 @@ urlpatterns = [
     path("auth/token/refresh/", TokenRefreshView.as_view(),          name="token-refresh"),
     # User profile
     path("users/me/",           views.MyProfileView.as_view(),       name="my-profile"),
+    # Reference data
+    path("governorates/",       views.GovernoratesView.as_view(),    name="governorates"),
 ]

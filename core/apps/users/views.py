@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.throttling import AuthRateThrottle
+from .governorates import GOVERNORATES
 from .models import User
 from .serializers import (
     UserSerializer,
@@ -13,6 +14,18 @@ from .serializers import (
     UserUpdateSerializer,
     PasswordChangeSerializer,
 )
+
+
+class GovernoratesView(APIView):
+    """Static list of Egypt's 27 governorates with English + Arabic
+    labels. Public — every sign-up form (mobile + dashboard) hydrates
+    its governorate dropdown from this endpoint, which keeps the list
+    in one place even if it changes."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(GOVERNORATES)
 
 
 def get_tokens(user):

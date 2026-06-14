@@ -14,6 +14,8 @@ abstract class AuthRepo {
     required String password,
     required String phone,
     required String role,
+    required String governorate,
+    String city,
     String address,
     Uint8List? profileImageBytes,
   });

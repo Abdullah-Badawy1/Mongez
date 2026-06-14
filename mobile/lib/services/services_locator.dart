@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:mongez/features/auth/repos/auth_repo_implementation.dart';
+import 'package:mongez/features/auth/repos/governorates_repo.dart';
 import 'package:mongez/features/favorites/data/repositories/favorites_repository_impl.dart';
 import 'package:mongez/features/favorites/domain/favorites_repository.dart';
 import 'package:mongez/features/home/repos/home_repo.dart';
@@ -24,6 +25,9 @@ void setup() {
   // Auth
   getIt.registerLazySingleton(
     () => AuthRepoImplementation(getIt.get<ApiService>()),
+  );
+  getIt.registerLazySingleton<GovernoratesRepo>(
+    () => GovernoratesRepo(getIt.get<ApiService>()),
   );
 
   // Home / Categories

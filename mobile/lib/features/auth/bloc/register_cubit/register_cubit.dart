@@ -43,9 +43,11 @@ class RegisterCubit extends Cubit<RegisterState> {
     required String userName,
     required String name,
     required String password,
-    required String address,
     required String phone,
     required String role,
+    required String governorate,
+    String city = "",
+    String address = "",
   }) async {
     emit(RegisterLoading(_imageBytes));
 
@@ -53,9 +55,11 @@ class RegisterCubit extends Cubit<RegisterState> {
       userName: userName,
       name: name,
       password: password,
-      address: address,
       phone: phone,
       role: role,
+      governorate: governorate,
+      city: city,
+      address: address,
       profileImageBytes: _imageBytes,
     );
 

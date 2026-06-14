@@ -95,6 +95,19 @@ export const categoriesAPI = {
   create: (data) => api.post('/categories/create/', data),
 };
 
+// Static reference list shared with the mobile. Cached in-memory by
+// listGovernorates() below so the dropdown doesn't re-fetch on every
+// modal open.
+let _govCache = null;
+export const referenceAPI = {
+  listGovernorates: async () => {
+    if (_govCache) return _govCache;
+    const res = await api.get('/governorates/');
+    _govCache = res.data;
+    return _govCache;
+  },
+};
+
 export const workersAPI = {
   list: (params) => api.get('/workers/', { params }),
   detail: (id) => api.get(`/workers/${id}/`),

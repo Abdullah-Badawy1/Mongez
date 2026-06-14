@@ -12,6 +12,11 @@ class Endpoints {
   // ── Categories ──
   static const String categories = 'categories/';
 
+  // ── Reference data ──
+  // Hydrates the governorate dropdown on the register screen + any
+  // future address-picker. Public endpoint, no auth required.
+  static const String governorates = 'governorates/';
+
   // ── Workers ──
   static const String workers = 'workers/';
   static const String workersCreate = 'workers/create/';

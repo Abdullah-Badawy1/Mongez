@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { adminAPI } from '../../services/api';
+import { adminAPI, referenceAPI } from '../../services/api';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 
 const roleColors = {
@@ -8,11 +8,15 @@ const roleColors = {
   client: { bg: '#3b82f620', color: '#3b82f6' },
 };
 
-const emptyForm = { username: '', phone: '', email: '', password: '', role: 'client', address: '', is_active: true };
+const emptyForm = {
+  username: '', phone: '', email: '', password: '', role: 'client',
+  governorate: '', city: '', address: '', is_active: true,
+};
 
 const Users = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [governorateFilter, setGovernorateFilter] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -20,12 +24,28 @@ const Users = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formError, setFormError] = useState(null);
+  const [governorates, setGovernorates] = useState([]);
+
+  // Load the 27-entry list once for the filter + add/edit dropdown.
+  useEffect(() => {
+    referenceAPI.listGovernorates()
+      .then(setGovernorates)
+      .catch(() => setGovernorates([]));
+  }, []);
+  const govLabel = useCallback((code) => {
+    if (!code) return '';
+    const g = governorates.find((x) => x.code === code);
+    return g ? `${g.name_en}` : code;
+  }, [governorates]);
 
   const pageSize = 15;
 
   // The fetcher captures the current filter values; usePolling resets its
   // timer when the fetcher reference changes, which is exactly what we
-  // want when search / role / page change.
+  // want when search / role / governorate / page change. Backend doesn't
+  // (yet) support `governorate=` as a query param on /api/admin/users/,
+  // so we apply that filter client-side after the fetch — small list of
+  // 27 codes makes this trivially cheap.
   const fetchUsers = useCallback(async () => {
     const params = { page, page_size: pageSize };
     if (search) params.search = search;
@@ -40,11 +60,14 @@ const Users = () => {
     intervalMs: 30_000,
     initialData: { results: [], count: 0 },
   });
-  const users = data?.results || [];
+  const allUsers = data?.results || [];
+  const users = governorateFilter
+    ? allUsers.filter((u) => u.governorate === governorateFilter)
+    : allUsers;
   const total = data?.count || 0;
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
-  useEffect(() => { setPage(1); }, [search, roleFilter]);
+  useEffect(() => { setPage(1); }, [search, roleFilter, governorateFilter]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -63,6 +86,8 @@ const Users = () => {
       email: user.email || '',
       password: '',
       role: user.role,
+      governorate: user.governorate || '',
+      city: user.city || '',
       address: user.address || '',
       is_active: user.is_active !== undefined ? user.is_active : true,
     });
@@ -172,9 +197,17 @@ const Users = () => {
                 <option value="client">Client</option>
               </select>
             </div>
-            <div className="col-md-3 text-end">
-              <span className="text-muted" style={{ fontSize: '14px' }}>Total: {total} users</span>
+            <div className="col-md-3">
+              <select className="form-select" value={governorateFilter} onChange={(e) => setGovernorateFilter(e.target.value)} style={{ padding: '10px 15px', borderRadius: '10px' }}>
+                <option value="">All Governorates</option>
+                {governorates.map((g) => (
+                  <option key={g.code} value={g.code}>{g.name_en} — {g.name_ar}</option>
+                ))}
+              </select>
             </div>
+          </div>
+          <div className="text-muted small mb-2" style={{ fontSize: '13px' }}>
+            Total: {total} users{governorateFilter ? ` · filtered by ${govLabel(governorateFilter)}` : ''}
           </div>
 
           <div className="table-responsive">
@@ -186,6 +219,7 @@ const Users = () => {
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Phone</th>
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Email</th>
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Role</th>
+                  <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Governorate</th>
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Status</th>
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Joined</th>
                   <th style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Actions</th>
@@ -193,10 +227,10 @@ const Users = () => {
               </thead>
               <tbody>
                 {loading && (
-                  <tr><td colSpan="8" className="text-center py-5"><div className="spinner-border text-primary" role="status"></div></td></tr>
+                  <tr><td colSpan="9" className="text-center py-5"><div className="spinner-border text-primary" role="status"></div></td></tr>
                 )}
                 {!loading && users.length === 0 && (
-                  <tr><td colSpan="8" className="text-center py-5 text-muted">No users found</td></tr>
+                  <tr><td colSpan="9" className="text-center py-5 text-muted">No users found</td></tr>
                 )}
                 {!loading && users.map((user) => {
                   const rc = roleColors[user.role] || roleColors.client;
@@ -217,6 +251,10 @@ const Users = () => {
                         <span className="badge rounded-pill px-3 py-2" style={{ backgroundColor: rc.bg, color: rc.color, fontSize: '12px', fontWeight: '500' }}>
                           {user.role}
                         </span>
+                      </td>
+                      <td style={{ color: '#475569', fontSize: '13px' }}>
+                        {user.governorate_label || govLabel(user.governorate) || '-'}
+                        {user.city ? <div className="text-muted" style={{ fontSize: '11px' }}>{user.city}</div> : null}
                       </td>
                       <td>
                         <span className={`badge rounded-pill px-3 py-2 ${user.is_active ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '12px', fontWeight: '500' }}>
@@ -312,8 +350,29 @@ const Users = () => {
                       </select>
                     </div>
                   </div>
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label" style={{ fontSize: '13px', fontWeight: '500' }}>Governorate {editingUser ? '' : '*'}</label>
+                      <select
+                        className="form-select"
+                        required={!editingUser}
+                        value={form.governorate}
+                        onChange={(e) => setForm({...form, governorate: e.target.value})}
+                        style={{ borderRadius: '10px', padding: '10px 14px' }}
+                      >
+                        <option value="">Select governorate…</option>
+                        {governorates.map((g) => (
+                          <option key={g.code} value={g.code}>{g.name_en} — {g.name_ar}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label" style={{ fontSize: '13px', fontWeight: '500' }}>City / Area</label>
+                      <input className="form-control" placeholder="e.g. Nasr City" value={form.city} onChange={(e) => setForm({...form, city: e.target.value})} style={{ borderRadius: '10px', padding: '10px 14px' }} />
+                    </div>
+                  </div>
                   <div className="mb-3">
-                    <label className="form-label" style={{ fontSize: '13px', fontWeight: '500' }}>Address</label>
+                    <label className="form-label" style={{ fontSize: '13px', fontWeight: '500' }}>Street address (optional)</label>
                     <input className="form-control" value={form.address} onChange={(e) => setForm({...form, address: e.target.value})} style={{ borderRadius: '10px', padding: '10px 14px' }} />
                   </div>
                 </div>
