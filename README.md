@@ -300,9 +300,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Installation
 
-* Generic step-by-step guide: [INSTALL.md](INSTALL.md)
-* Windows-specific guide:     [WINDOWS.md](WINDOWS.md)
-* Architecture & UML diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+* **Step-by-step run guide:**    [RUNNING.md](RUNNING.md)  ← start here
+* Generic step-by-step install:  [INSTALL.md](INSTALL.md)
+* Windows-specific guide:        [WINDOWS.md](WINDOWS.md)
+* Architecture & UML diagrams:   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 * Step-by-step testing playbook: [TESTING.md](TESTING.md)
 
 ---
