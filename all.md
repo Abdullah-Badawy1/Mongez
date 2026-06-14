@@ -17,7 +17,7 @@ end users and one platform operator:
 |---|---|
 | **Client** | Browses workers by category, places a service order, pays the worker in cash on-site, then rates the worker. |
 | **Worker** (technician) | Lists themselves under a profession (Plumbing, Electrical, etc.), receives incoming orders, accepts/rejects them, and marks them complete. |
-| **Admin** | Signs into the React dashboard (`front/`) to manage categories, users, workers, orders, payments, and ratings. The branded Django admin at `/admin/` remains as a power-user fallback. |
+| **Admin** | Signs into the React dashboard (`front/`) to manage categories, users, workers, orders, payments, and ratings. There is no Django admin — Django is a pure REST API. |
 
 The platform itself earns a **flat commission per accepted order**
 (`COMMISSION_AMOUNT`, default 20 EGP). Workers and clients still exchange
@@ -46,8 +46,6 @@ Mongez/
 │       ├── ratings/          · Post-job star ratings
 │       ├── favorites/        · Saved workers per client
 │       └── admin_api/        · REST endpoints consumed by the React dashboard
-├── core/templates/admin/     ← Custom Django admin theme (branding/extrastyle)
-├── core/static/admin/css/    ← Custom admin theme CSS (Tailwind-ish tokens)
 ├── front/                    ← React + Vite web dashboard (landing + admin)
 │   ├── index.html · vite.config.js (dev proxy → 127.0.0.1:8000)
 │   ├── firebase.json         · Firebase Hosting config (dist/)
@@ -177,8 +175,8 @@ Data flow at a glance:
   configurable via `THROTTLE_*` env vars.
 - `SIMPLE_JWT` lifetimes come from `JWT_ACCESS_MINUTES` and
   `JWT_REFRESH_DAYS`; refresh tokens rotate on use.
-- `WhiteNoise` serves `/static/` so the Django admin and DRF browsable API
-  still look right with `DEBUG=false`.
+- `WhiteNoise` serves `/static/` so the DRF browsable API still looks
+  right with `DEBUG=false`.
 - Paymob settings (`PAYMOB_API_KEY`, `PAYMOB_INTEGRATION_ID`,
   `PAYMOB_HMAC_SECRET`, `COMMISSION_AMOUNT`) and `FCM_SERVER_KEY` are read
   from env; missing values disable the integration cleanly.
@@ -196,8 +194,12 @@ GET  /api/health/            → {"status":"ok"}     ← used by Docker HEALTHCH
      /api/payments/webhook/  → apps.payments.urls
      /api/ratings/...        → apps.ratings.urls
      /api/favorites/...      → apps.favorites.urls
-     /admin/                 → Django admin
+     /api/admin/...          → apps.admin_api.urls   (REST, dashboard-only)
 ```
+
+There is **no Django admin URL** — Django is a pure REST backend. All
+management UI lives in the React dashboard (`front/`); the
+`apps.admin_api` REST app provides the endpoints it consumes (§4.9).
 
 `core/permissions.py` defines `IsClient`, `IsWorker`, `IsAdmin`,
 `IsClientOrWorker`, `IsOrderParticipant` — these replace inline `if
@@ -397,13 +399,12 @@ These power every screen under `front/src/pages/admin/`. They're plain
 JSON over the same `/api/` mount and the same JWT auth — the dashboard
 re-uses the regular login endpoints.
 
-Beyond the REST layer, the app also ships a **custom Django admin
-theme** at `core/templates/admin/base_site.html` +
-`core/static/admin/css/custom_admin.css` — the legacy `/admin/` URL is
-still wired up and now renders in the Mongez brand colors with an
-Arabic-friendly footer. Picked up automatically because
-`STATICFILES_DIRS` and `TEMPLATES.DIRS` point at `core/static` and
-`core/templates` in `core/settings.py`.
+The Django backend is **REST-only**: `django.contrib.admin` and
+`django.contrib.messages` are no longer in `INSTALLED_APPS`, no
+`admin.py` files exist, no `/admin/` URL is mounted. Operational
+management runs through the React dashboard via `apps.admin_api`. If
+you ever need direct DB access, use `python manage.py shell` (or DB
+introspection tools), not a browser admin.
 
 ---
 
@@ -629,14 +630,13 @@ over.
 - Media (e.g. user avatars in tables) is served from the Django
   `/media/` mount.
 
-### 6.6 Custom Django admin theme
+### 6.6 No Django admin
 
-A separate, lower-fidelity admin still lives at `/admin/` (Django's
-built-in). It now extends `core/templates/admin/base_site.html` and
-loads `core/static/admin/css/custom_admin.css`, giving the legacy admin
-the same Mongez branding (purple/indigo palette, Inter font, Arabic
-title). Useful as a fallback or for power-user models the React
-dashboard doesn't expose.
+There is no `/admin/` page. The legacy `django.contrib.admin` was
+removed in favor of a pure REST surface — the React dashboard is the
+sole management UI, talking to `apps.admin_api` over JSON. If a
+collaborator looks for the old `/admin/` URL they will get a 404; that
+is intentional.
 
 ---
 
@@ -863,8 +863,10 @@ Admin (used by the React dashboard — admin role only)
 
 Misc
   GET   /api/health/                                public (used by HEALTHCHECK)
-  /admin/                                           Django admin (custom Mongez theme)
 ```
+
+> Django is REST-only — there is no `/admin/` page. All operational
+> management goes through the React dashboard at <http://localhost:5173/>.
 
 ---
 
@@ -882,9 +884,9 @@ Misc
   admin console). It calls the same `/api/` mount the mobile uses, plus
   the new `/api/admin/*` endpoints in `apps.admin_api`. Deployable as a
   static bundle via Firebase Hosting (`firebase.json`).
-- **Custom Django admin theme** lives in `core/templates/admin/` and
-  `core/static/admin/css/`, picked up via `TEMPLATES.DIRS` and
-  `STATICFILES_DIRS` in `core/settings.py`.
+- **No Django admin.** `django.contrib.admin` is not in
+  `INSTALLED_APPS`; no `admin.py` files; no `/admin/` URL. The React
+  dashboard is the sole management UI, calling `apps.admin_api`.
 - **Data** is SQLite plus an uploads directory, both kept on named
   Docker volumes so they survive rebuilds.
 - **Paymob** is the only external dependency in the order flow, and only

@@ -91,19 +91,29 @@ curl http://localhost:8000/api/workers/
 # {"count":0,"next":null,"previous":null,"results":[]}
 ```
 
-### 2d. Create admin user and seed categories
+### 2d. Create admin user and seed data
+
+The backend is a **pure REST API** — there is no Django admin page.
+Create admin / client / worker test accounts with the bundled
+launcher:
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+./start.sh --seed
+# → client1 / ClientPass123
+# → worker1 / WorkerPass123
+# → admin1  / AdminPass123
 ```
 
-Then open **http://localhost:8000/admin/** and log in. Under **Workers → Service Categories**, create a few entries (e.g. `Plumbing`, `Electrical`, `Cleaning`). The mobile app home screen will display these categories.
+Then log in to the React dashboard at <http://localhost:5173/> as
+`admin1` and use the **Categories** screen to add Plumbing,
+Electrical, Cleaning, etc. The mobile app home screen will display
+these categories.
 
 ### 2e. Run the test suite (optional)
 
 ```bash
 docker compose exec web python manage.py test apps
-# Ran 32 tests in 2.5s — OK
+# Ran 36 tests in ~5s — OK
 ```
 
 ---
@@ -259,7 +269,7 @@ crashed during boot — read the logs.
 | View logs | `docker compose logs -f web` |
 | Run tests | `docker compose exec web python manage.py test apps` |
 | Open Django shell | `docker compose exec web python manage.py shell` |
-| Make a superuser | `docker compose exec web python manage.py createsuperuser` |
+| Seed test accounts | `./start.sh --seed` |
 | Apply new migrations | `docker compose exec web python manage.py migrate` (also runs on boot) |
 | Restart only | `docker compose restart web` |
 | Stop everything | `docker compose down` |

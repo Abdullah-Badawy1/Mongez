@@ -60,7 +60,6 @@ You'll see this when it's done:
 ================ Mongez is up ================
   API:       http://localhost:8000/api/health/
   Workers:   http://localhost:8000/api/workers/
-  Admin:     http://localhost:8000/admin/
   Dashboard: http://localhost:5173/
 
   Test accounts:
@@ -100,11 +99,13 @@ Verify it's alive:
 
 ```bash
 curl http://localhost:8000/api/health/      # → {"status": "ok"}
+curl http://localhost:8000/api/workers/     # public, returns paginated list
 ```
 
-Hit the admin (with the custom Mongez theme):
-
-* <http://localhost:8000/admin/> — log in as `admin1` / `AdminPass123` (after `--seed`).
+There is **no Django admin** — the backend is a pure REST API. All
+management happens via the React dashboard's `/admin/*` routes
+(§2.2), which hit the `/api/admin/*` endpoints under
+`apps.admin_api`.
 
 ### 2.2 Dashboard only (Vite dev server)
 

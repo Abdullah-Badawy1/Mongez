@@ -120,8 +120,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 |---|---|
 | Django REST API   | <http://localhost:8000/api/> |
 | Health check      | <http://localhost:8000/api/health/> |
-| Django admin (custom Mongez theme) | <http://localhost:8000/admin/> |
-| Dashboard (Vite dev server) | <http://localhost:5173/> |
+| Dashboard (Vite dev server) — landing + admin console | <http://localhost:5173/> |
 | Mobile (`flutter run`) | A device window or the device picker prompt |
 
 Test accounts (only with `-Seed`):

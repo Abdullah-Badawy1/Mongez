@@ -304,7 +304,7 @@ This is the *"everything talks to everything"* test. ~10 minutes.
 2. **Confirm three surfaces are alive**
 
    * <http://localhost:8000/api/health/> → `{"status":"ok"}`
-   * <http://localhost:8000/admin/> → branded Django admin login
+   * <http://localhost:8000/admin/> → 404 (Django admin removed by design)
    * <http://localhost:5173/> → marketing landing page
 
 3. **Run automated backend tests** (§2.3) — must be `OK`.

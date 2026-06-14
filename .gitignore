@@ -22,6 +22,10 @@ _dashboard_unpack/
 .dashboard.pid
 .dashboard.log
 
+# PlantUML render output — regenerate with plantuml.jar
+docs/mongez-*.svg
+docs/mongez-*.png
+
 # Frontend (dashboard React app)
 front/node_modules/
 front/dist/

@@ -82,7 +82,6 @@ $ComposeService      = "web"
 $ContainerName       = "mongez-backend"
 $HealthUrl           = "http://localhost:8000/api/health/"
 $WorkersUrl          = "http://localhost:8000/api/workers/"
-$AdminUrl            = "http://localhost:8000/admin/"
 
 $DashboardDir        = "front"
 $DashboardEnvFile    = Join-Path $DashboardDir ".env"
@@ -337,7 +336,6 @@ Write-Host ""
 Write-Host "${Esc}[1;36m================ Mongez is up ================${Esc}[0m"
 Write-Host "  API:       $HealthUrl" -ForegroundColor Green
 Write-Host "  Workers:   $WorkersUrl" -ForegroundColor Green
-Write-Host "  Admin:     $AdminUrl" -ForegroundColor Green
 if ($DashboardRunning) {
     Write-Host "  Dashboard: $DashboardUrl" -ForegroundColor Green
 }

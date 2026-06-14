@@ -1,6 +1,6 @@
 # Mongez — Home Services Platform
 
-A full-stack home services app with three components: **Django REST Framework** backend, **Flutter** mobile app, and a **React + Vite** web dashboard (landing page + admin console). Clients browse workers, place orders, and track them in real time; workers manage incoming requests; admins manage everything from the browser.
+A full-stack home services app with three components: **Django REST Framework** backend (REST API only — no Django admin), **Flutter** mobile app, and a **React + Vite** web dashboard (public landing page + role-gated admin console). Clients browse workers, place orders, and track them in real time; workers manage incoming requests; admins manage everything from the dashboard.
 
 ---
 
@@ -22,11 +22,9 @@ A full-stack home services app with three components: **Django REST Framework** 
 
 ```
 Mongez/
-├── core/                          # Django project
+├── core/                          # Django project (REST API only)
 │   ├── settings.py
 │   ├── urls.py
-│   ├── templates/admin/           # Custom Django admin template (branded)
-│   ├── static/admin/css/          # Custom admin theme CSS
 │   └── apps/
 │       ├── users/                 # Auth, profiles, roles (CLIENT/WORKER/ADMIN)
 │       ├── workers/               # Worker profiles, service categories
@@ -119,12 +117,18 @@ curl http://localhost:8000/api/workers/
 ### 4. Seed initial data
 
 ```bash
-# Create a superuser (one-time setup)
-docker compose exec web python manage.py createsuperuser
+# Create three test accounts (client1 / worker1 / admin1, all *Pass123):
+./start.sh --seed
 
-# Visit http://localhost:8000/admin/
-# Create ServiceCategory objects (e.g. Plumbing, Electrical, Cleaning)
+# Or do it manually from a Django shell:
+docker compose exec web python manage.py shell
+# → from apps.users.models import User
+# → User.objects.create_user(username="admin1", phone="0100…",
+#                             password="…", role=User.Role.ADMIN)
 ```
+
+Manage the data from the React dashboard (admin console) — visit
+<http://localhost:5173/admin/dashboard> after logging in as an admin.
 
 ### 5. Run the mobile app
 

@@ -32,7 +32,6 @@ COMPOSE_SERVICE="web"
 CONTAINER_NAME="mongez-backend"
 HEALTH_URL="http://localhost:8000/api/health/"
 WORKERS_URL="http://localhost:8000/api/workers/"
-ADMIN_URL="http://localhost:8000/admin/"
 
 DASHBOARD_DIR="front"
 DASHBOARD_ENV_FILE="$DASHBOARD_DIR/.env"
@@ -275,7 +274,6 @@ printf "\n%s================ Mongez is up ================%s\n" "$C_HL" "$C_RST"
 printf "  API:     %shttp://localhost:8000/api/%s\n"      "$C_OK" "$C_RST"
 printf "  Health:  %s%s%s\n"                              "$C_OK" "$HEALTH_URL" "$C_RST"
 printf "  Workers: %s%s%s\n"                              "$C_OK" "$WORKERS_URL" "$C_RST"
-printf "  Admin:   %s%s%s\n"                              "$C_OK" "$ADMIN_URL"   "$C_RST"
 if [ "$DASHBOARD_RUNNING" = 1 ]; then
   printf "  Dashboard: %s%s%s\n"                          "$C_OK" "$DASHBOARD_URL" "$C_RST"
 fi

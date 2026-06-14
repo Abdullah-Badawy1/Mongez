@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path, re_path
 from django.views.static import serve as serve_static
@@ -22,7 +21,6 @@ api_patterns = [
 ]
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
     path("api/", include(api_patterns)),
 ]
 
