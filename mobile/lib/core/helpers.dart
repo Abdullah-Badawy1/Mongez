@@ -8,6 +8,15 @@ class AppPrefs {
     _prefs = await SharedPreferences.getInstance();
   }
 
+  // ── Onboarding ─────────────────────────────────────
+  static const String _onboardingKey = 'onboarding_seen';
+
+  static bool get isOnboardingSeen => _prefs?.getBool(_onboardingKey) ?? false;
+
+  static Future<void> setOnboardingSeen(bool value) async {
+    await _prefs?.setBool(_onboardingKey, value);
+  }
+
   // ── Theme ──────────────────────────────────────────
   static const String _themeKey = 'is_dark_mode';
 
@@ -49,39 +58,4 @@ class AppPrefs {
   static Future<void> setLocale(String langCode) async {
     await _prefs?.setString(_localeKey, langCode);
   }
-
-  // ── Auth tokens ────────────────────────────────────
-  static const _accessKey = 'access_token';
-  static const _refreshKey = 'refresh_token';
-  static const _roleKey = 'user_role';
-  static const _usernameKey = 'username';
-
-  static String? get accessToken => _prefs?.getString(_accessKey);
-  static String? get refreshToken => _prefs?.getString(_refreshKey);
-  static String? get userRole => _prefs?.getString(_roleKey);
-  static String? get username => _prefs?.getString(_usernameKey);
-
-  static Future<void> setAccessToken(String token) async =>
-      _prefs?.setString(_accessKey, token);
-
-  static Future<void> saveTokens({
-    required String access,
-    required String refresh,
-    required String role,
-    required String username,
-  }) async {
-    await _prefs?.setString(_accessKey, access);
-    await _prefs?.setString(_refreshKey, refresh);
-    await _prefs?.setString(_roleKey, role);
-    await _prefs?.setString(_usernameKey, username);
-  }
-
-  static Future<void> clearTokens() async {
-    await _prefs?.remove(_accessKey);
-    await _prefs?.remove(_refreshKey);
-    await _prefs?.remove(_roleKey);
-    await _prefs?.remove(_usernameKey);
-  }
-
-  static bool get isLoggedIn => _prefs?.getString(_accessKey) != null;
 }

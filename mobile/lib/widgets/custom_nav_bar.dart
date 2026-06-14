@@ -15,37 +15,112 @@ class CustomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
 
-    return BottomNavigationBar(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      elevation: 0,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: colorScheme.primary,
-      unselectedItemColor: textTheme.bodySmall?.color,
-      selectedLabelStyle: textTheme.bodySmall?.copyWith(fontSize: 12),
-      unselectedLabelStyle: textTheme.bodySmall?.copyWith(fontSize: 12),
-      currentIndex: currentIndex,
-      onTap: onTap,
-      items: elements.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-
-        final isSelected = currentIndex == index;
-
-        return BottomNavigationBarItem(
-          icon: Image.asset(
-            item.iconPath,
-            width: 24,
-            height: 24,
-            color: isSelected
-                ? colorScheme.primary
-                : textTheme.bodySmall?.color,
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(
+          top: BorderSide(
+            color: cs.outline.withValues(alpha: 0.5),
+            width: 1,
           ),
-          label: item.label,
-        );
-      }).toList(),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: elements.asMap().entries.map((entry) {
+              final i = entry.key;
+              final item = entry.value;
+              final selected = currentIndex == i;
+              return Expanded(
+                child: _NavButton(
+                  item: item,
+                  selected: selected,
+                  onTap: () => onTap(i),
+                  selectedColor: cs.primary,
+                  unselectedColor: cs.onSurface.withValues(alpha: 0.55),
+                  pillColor: cs.primaryContainer,
+                  textTheme: tt,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final NavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color selectedColor;
+  final Color unselectedColor;
+  final Color pillColor;
+  final TextTheme textTheme;
+
+  const _NavButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    required this.selectedColor,
+    required this.unselectedColor,
+    required this.pillColor,
+    required this.textTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: selected ? pillColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Image.asset(
+                  item.iconPath,
+                  width: 22,
+                  height: 22,
+                  color: selected ? selectedColor : unselectedColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? selectedColor : unselectedColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,0 +1,34 @@
+# Dev override — auto-loaded by `docker compose` alongside docker-compose.yml.
+#
+# What it changes vs. the base file:
+#   • Bind-mounts the repo's db.sqlite3 INTO the container so the running API
+#     reads/writes the same database file the host sees (no more "the volume
+#     has different data than ./db.sqlite3" surprises).
+#   • Bind-mounts ./media so uploaded files land in the repo, not in a hidden
+#     named volume.
+#   • Bind-mounts source code (./core, ./manage.py, ./entrypoint.sh) so edits
+#     on the host are visible to the container WITHOUT rebuilding the image.
+#   • Sets RELOAD=1 so Gunicorn restarts workers when a .py file changes.
+#   • Repoints SQLITE_PATH to the bind-mounted file (NOT the volume path).
+#
+# To temporarily disable this override (run as production-style):
+#     docker compose -f docker-compose.yml up -d
+#
+# Volumes section is intentionally minimal — the named volumes from the base
+# file (sqlite_data, media_data) stay defined but are unused while this
+# override is active.
+
+services:
+  web:
+    environment:
+      SQLITE_PATH: /app/db.sqlite3
+      RELOAD: "1"
+    volumes:
+      # DB — same file the host sees at ./db.sqlite3
+      - ./db.sqlite3:/app/db.sqlite3
+      # Uploaded media
+      - ./media:/app/media
+      # Source code — edits reflect immediately (with RELOAD=1)
+      - ./core:/app/core
+      - ./manage.py:/app/manage.py
+      - ./entrypoint.sh:/app/entrypoint.sh

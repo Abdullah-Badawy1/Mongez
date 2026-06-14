@@ -18,6 +18,9 @@ class Favorite(models.Model):
 
     class Meta:
         unique_together = ["client", "worker"]
+        indexes = [
+            models.Index(fields=["client", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.client.username} ♥ {self.worker.username}"

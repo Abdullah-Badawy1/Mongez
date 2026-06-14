@@ -3,15 +3,36 @@ from apps.users.models import User
 from apps.users.serializers import UserSerializer
 from apps.workers.models import ServiceCategory, WorkerProfile
 from apps.workers.serializers import ServiceCategorySerializer
-from .models import Order
+from .models import Order, OrderAttachment
+
+
+class OrderAttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderAttachment
+        fields = [
+            "id", "kind", "file", "file_url", "caption",
+            "duration_seconds", "size_bytes", "created_at",
+        ]
+        read_only_fields = ["id", "size_bytes", "created_at", "file_url"]
+        extra_kwargs = {"file": {"write_only": True}}
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        url = obj.file.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    
+
     client = UserSerializer(read_only=True)
     worker = UserSerializer(read_only=True)
     service_category = ServiceCategorySerializer(read_only=True)
     commission_payment = serializers.SerializerMethodField()
+    attachments = OrderAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
@@ -20,8 +41,15 @@ class OrderSerializer(serializers.ModelSerializer):
             "client",
             "worker",
             "service_category",
+            "description",
+            "address_text",
+            "latitude",
+            "longitude",
+            "urgency",
+            "scheduled_for",
             "commission",
             "status",
+            "attachments",
             "created_at",
             "accepted_at",
             "completed_at",
@@ -43,7 +71,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class OrderCreateSerializer(serializers.ModelSerializer):
-    
+
     service_category = serializers.PrimaryKeyRelatedField(
         queryset=ServiceCategory.objects.all(),
     )
@@ -56,7 +84,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Order
-        fields = ["service_category", "worker_id"]
+        fields = [
+            "service_category", "worker_id",
+            "description", "address_text",
+            "latitude", "longitude",
+            "urgency", "scheduled_for",
+        ]
 
     def validate(self, attrs):
         """Validate worker against category when worker_id is provided."""

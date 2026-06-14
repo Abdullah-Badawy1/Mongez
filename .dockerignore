@@ -1,17 +1,37 @@
+# Python cache + virtualenvs
 venv/
 .venv/
 __pycache__/
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Local secrets and DBs (always built from the .env supplied at run time)
 .env
 db.sqlite3
+db.sqlite3-journal
+
+# Outputs
 media/
 staticfiles/
+
+# VCS + tooling
 .git/
+.gitignore
 .github/
-docs/
 .claude/
 .codex
+.idea/
+.vscode/
+
+# Docs (kept in source control, not needed in the image)
+docs/
 *.md
 *.log
+
+# The Flutter app — it's not built or served by this image
+mobile/
+
+# OS junk
+.DS_Store
+Thumbs.db

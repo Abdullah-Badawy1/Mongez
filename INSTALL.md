@@ -35,28 +35,42 @@ cd Mongez
 cp .env.example .env
 ```
 
-Edit `.env` and set a secret key:
+`.env.example` is fully commented and groups every variable: Django core,
+CORS, JWT, pagination, rate limiting (`THROTTLE_*`), Paymob, and FCM
+(`FCM_SERVER_KEY` — leave blank in dev so push delivery is a no-op).
 
-```env
-DJANGO_SECRET_KEY=replace-this-with-a-long-random-string
-DJANGO_DEBUG=false
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOW_ALL_ORIGINS=true
-```
-
-Generate a secure key with:
+Set a real secret key:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 ```
 
+…and paste the output as `DJANGO_SECRET_KEY` in `.env`.
+
+For Android emulator access, make sure `10.0.2.2` is in
+`DJANGO_ALLOWED_HOSTS` (the default already includes it).
+
 ### 2b. Build and start
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-First run takes ~2 minutes to build the image and download dependencies. Subsequent starts are instant.
+First run takes ~30 seconds to build and another ~10 seconds to apply
+migrations. Subsequent starts are instant.
+
+The image:
+- runs as an unprivileged user (`uid 1000`),
+- ships a `HEALTHCHECK` that hits `GET /api/health/` every 30 s,
+- auto-applies pending migrations on every boot,
+- serves static files (admin + DRF browsable API) via WhiteNoise.
+
+Verify health is `healthy` (not just `running`):
+
+```bash
+docker compose ps
+# STATUS column should read "Up X seconds (healthy)"
+```
 
 You should see:
 
@@ -70,12 +84,11 @@ web-1  | [INFO] Listening at: http://0.0.0.0:8000
 ### 2c. Verify
 
 ```bash
-curl http://localhost:8000/api/workers/
-```
+curl http://localhost:8000/api/health/
+# {"status": "ok"}
 
-Expected response:
-```json
-{"count": 0, "next": null, "previous": null, "results": []}
+curl http://localhost:8000/api/workers/
+# {"count":0,"next":null,"previous":null,"results":[]}
 ```
 
 ### 2d. Create admin user and seed categories
@@ -85,6 +98,13 @@ docker compose exec web python manage.py createsuperuser
 ```
 
 Then open **http://localhost:8000/admin/** and log in. Under **Workers → Service Categories**, create a few entries (e.g. `Plumbing`, `Electrical`, `Cleaning`). The mobile app home screen will display these categories.
+
+### 2e. Run the test suite (optional)
+
+```bash
+docker compose exec web python manage.py test apps
+# Ran 32 tests in 2.5s — OK
+```
 
 ---
 
@@ -206,3 +226,41 @@ Add to `.env`:
 CSRF_TRUSTED_ORIGINS=http://localhost:8000
 ```
 Then restart: `docker compose restart web`
+
+**Throttle limits trigger sporadically in development**
+Gunicorn runs with 2 workers by default and DRF's default rate-limit cache
+is per-process. If you need consistent throttling across workers, set up a
+shared cache (Redis):
+
+```env
+# .env
+CACHES_DEFAULT=django_redis.cache.RedisCache
+CACHES_LOCATION=redis://redis:6379/1
+```
+…and add a `redis:` service to `docker-compose.yml`. For local
+development the default in-memory cache is fine.
+
+**Container is `unhealthy`**
+```bash
+docker compose logs --tail=100 web
+docker inspect --format='{{json .State.Health}}' mongez-backend | python3 -m json.tool
+```
+Healthcheck calls `GET /api/health/`. A 503 typically means a worker
+crashed during boot — read the logs.
+
+---
+
+## Docker operations cheat-sheet
+
+| Task | Command |
+|---|---|
+| Build image | `docker compose build` |
+| Start (background) | `docker compose up -d` |
+| View logs | `docker compose logs -f web` |
+| Run tests | `docker compose exec web python manage.py test apps` |
+| Open Django shell | `docker compose exec web python manage.py shell` |
+| Make a superuser | `docker compose exec web python manage.py createsuperuser` |
+| Apply new migrations | `docker compose exec web python manage.py migrate` (also runs on boot) |
+| Restart only | `docker compose restart web` |
+| Stop everything | `docker compose down` |
+| Wipe data + restart | `docker compose down -v && docker compose up -d` |

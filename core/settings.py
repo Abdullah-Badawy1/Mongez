@@ -46,6 +46,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise serves /static/ when DEBUG=False so the admin + DRF
+    # browsable API still load their CSS without an external reverse proxy.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -106,6 +109,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -124,6 +128,17 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": int(os.getenv("API_PAGE_SIZE", "20")),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("THROTTLE_ANON", "30/min"),
+        "user": os.getenv("THROTTLE_USER", "120/min"),
+        "auth": os.getenv("THROTTLE_AUTH", "10/min"),       # login/register
+        "order_create": os.getenv("THROTTLE_ORDER", "20/hour"),
+        "rating": os.getenv("THROTTLE_RATING", "30/hour"),
+    },
 }
 
 SIMPLE_JWT = {
@@ -140,3 +155,6 @@ PAYMOB_API_KEY = os.getenv("PAYMOB_API_KEY", "")
 PAYMOB_INTEGRATION_ID = int(os.getenv("PAYMOB_INTEGRATION_ID", "0"))
 PAYMOB_HMAC_SECRET = os.getenv("PAYMOB_HMAC_SECRET", "")
 COMMISSION_AMOUNT = int(os.getenv("COMMISSION_AMOUNT", "20"))
+
+# Firebase Cloud Messaging — empty in dev, push delivery is then a no-op.
+FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "")

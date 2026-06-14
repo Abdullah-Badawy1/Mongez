@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mongez/core/app_colors.dart';
 
 class CustomFormField extends StatefulWidget {
   final TextEditingController? controller;
@@ -7,18 +6,18 @@ class CustomFormField extends StatefulWidget {
   final Widget? preIcon;
   final Widget? sufIcon;
   final bool obscureText;
-  final TextInputType? keyboardType; // ← هنا
+  final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
 
   const CustomFormField({
     super.key,
     this.controller,
-    this.hintText = 'Find your favorite items',
+    this.hintText = '',
     this.preIcon,
     this.sufIcon,
     this.obscureText = false,
-    this.keyboardType, // ← هنا
+    this.keyboardType,
     this.validator,
     this.onChanged,
   });
@@ -47,60 +46,93 @@ class _CustomFormFieldState extends State<CustomFormField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+
     return FormField<String>(
       validator: widget.validator,
       builder: (field) {
+        final hasError = field.hasError;
+        final borderColor = hasError
+            ? cs.error
+            : _isFocused
+                ? cs.primary
+                : cs.outline;
+        final borderWidth = (_isFocused || hasError) ? 1.6 : 1.0;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(_isFocused ? 0.2 : 0.1),
-                    blurRadius: _isFocused ? 10 : 6,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-                border: field.hasError
-                    ? Border.all(color: Colors.redAccent)
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor, width: borderWidth),
+                boxShadow: _isFocused
+                    ? [
+                        BoxShadow(
+                          color: cs.primary.withValues(alpha: 0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
                     : null,
               ),
               child: TextField(
                 focusNode: _focusNode,
                 controller: widget.controller,
                 obscureText: widget.obscureText,
-                keyboardType: widget.keyboardType, // ← هنا
-                onChanged: (value) {
-                  field.didChange(value);
-                  widget.onChanged?.call(value);
+                keyboardType: widget.keyboardType,
+                onChanged: (v) {
+                  field.didChange(v);
+                  widget.onChanged?.call(v);
                 },
-                style: const TextStyle(color: Colors.black),
-                cursorColor: AppColors.primary,
+                style: tt.bodyLarge?.copyWith(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                cursorColor: cs.primary,
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 14,
+                    vertical: 16,
                   ),
                   hintText: widget.hintText,
-                  hintStyle: TextStyle(color: AppColors.gray4),
+                  hintStyle: tt.bodyMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.45),
+                  ),
                   prefixIcon: widget.preIcon,
                   suffixIcon: widget.sufIcon,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: false,
                 ),
               ),
             ),
-
-            /// 🔴 Error خارج الفيلد
-            if (field.hasError)
+            if (hasError)
               Padding(
                 padding: const EdgeInsets.only(top: 6, left: 12),
-                child: Text(
-                  field.errorText!,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        size: 14, color: cs.error),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        field.errorText!,
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.error,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ],

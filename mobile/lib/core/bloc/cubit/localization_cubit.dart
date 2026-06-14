@@ -10,7 +10,7 @@ class LocalizationCubit extends Cubit<LocalizationState> {
     : super(LocalizationState(locale: Locale(AppPrefs.locale)));
 
   Future<void> changeLanguage(String langCode) async {
-    emit(LocalizationState(locale: Locale(langCode)));
     await AppPrefs.setLocale(langCode);
+    emit(LocalizationState(locale: Locale(langCode)));
   }
 }

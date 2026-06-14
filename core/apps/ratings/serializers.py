@@ -56,3 +56,14 @@ class RatingSerializer(serializers.ModelSerializer):
         profile.save()
 
         return rating
+
+
+class WorkerRatingSerializer(serializers.ModelSerializer):
+    """Public projection: shows the client's display name but not their account."""
+
+    client_name = serializers.CharField(source="client.username", read_only=True)
+
+    class Meta:
+        model = Rating
+        fields = ["id", "client_name", "stars", "review", "created_at"]
+        read_only_fields = fields

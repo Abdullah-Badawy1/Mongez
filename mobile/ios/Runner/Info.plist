@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Mongez uses your camera to take photos of issues you need fixed.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Mongez accesses your photo library to attach pictures to your service request.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mongez uses your microphone to record voice notes describing the issue.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Mongez uses your location to find nearby workers and route them to you.</string>
 </dict>
 </plist>

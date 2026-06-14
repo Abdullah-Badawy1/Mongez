@@ -4,8 +4,15 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from core.throttling import AuthRateThrottle
 from .models import User
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, UserUpdateSerializer
+from .serializers import (
+    UserSerializer,
+    RegisterSerializer,
+    LoginSerializer,
+    UserUpdateSerializer,
+    PasswordChangeSerializer,
+)
 
 
 def get_tokens(user):
@@ -21,12 +28,13 @@ def get_tokens(user):
 
 
 class RegisterView(APIView):
-   
+
     permission_classes = [AllowAny]
-    
+    throttle_classes = [AuthRateThrottle]
+
     def get(self, request):
         return Response({"message": "Use POST to register"})
-    
+
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
@@ -34,8 +42,8 @@ class RegisterView(APIView):
             return Response(
                 {
                     "message": "Account created successfully.",
-                    "user":    UserSerializer(user).data,
-                    "tokens":  get_tokens(user),
+                    "user": UserSerializer(user, context={"request": request}).data,
+                    "tokens": get_tokens(user),
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -43,8 +51,9 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
-   
+
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -53,22 +62,23 @@ class LoginView(APIView):
             return Response(
                 {
                     "message": "Login successful.",
-                    "user":    UserSerializer(user).data,
-                    "tokens":  get_tokens(user),
+                    "user": UserSerializer(user, context={"request": request}).data,
+                    "tokens": get_tokens(user),
                 }
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MyProfileView(APIView):
-   
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return Response(
+            UserSerializer(request.user, context={"request": request}).data
+        )
 
     def patch(self, request):
-        # partial=True allows updating just one field without sending all fields
         serializer = UserUpdateSerializer(
             request.user,
             data=request.data,
@@ -76,5 +86,47 @@ class MyProfileView(APIView):
         )
         if serializer.is_valid():
             serializer.save()
-            return Response(UserSerializer(request.user).data)
+            return Response(
+                UserSerializer(request.user, context={"request": request}).data
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordChangeView(APIView):
+    """PUT /api/auth/password/ — change the current user's password."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def put(self, request):
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            user = request.user
+            return Response({
+                "message": "Password updated.",
+                "tokens": get_tokens(user),  # rotate tokens after password change
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutView(APIView):
+    """POST /api/auth/logout/ — blacklist the supplied refresh token (if blacklist app is on)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh = request.data.get("refresh")
+        if not refresh:
+            return Response(
+                {"error": "Provide 'refresh' token to invalidate."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            RefreshToken(refresh).blacklist()
+        except Exception:
+            # Blacklist app may not be installed — best effort.
+            pass
+        return Response({"message": "Logged out."})

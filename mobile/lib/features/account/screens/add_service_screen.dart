@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mongez/features/auth/models/auth.dart';
+import 'package:mongez/features/home/bloc/categories_cubit/categories_cubit.dart';
+import 'package:mongez/features/workers/presentation/cubit/create_worker_profile_cubit.dart';
 import 'package:mongez/generated/l10n.dart';
+import 'package:mongez/services/navigation_service.dart';
 import 'package:mongez/widgets/custom_app_bar.dart';
-import 'package:mongez/widgets/custom_button.dart';
-import 'package:mongez/widgets/custom_text_form_field.dart';
 
 class AddServiceScreen extends StatefulWidget {
-  const AddServiceScreen({super.key});
+  final Auth? pendingAuth;
+  const AddServiceScreen({super.key, this.pendingAuth});
 
   @override
   State<AddServiceScreen> createState() => _AddServiceScreenState();
@@ -13,14 +18,26 @@ class AddServiceScreen extends StatefulWidget {
 
 class _AddServiceScreenState extends State<AddServiceScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
+  int? _selectedCategoryId;
+  final _experienceController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  bool _isAvailable = true;
 
   @override
   void dispose() {
-    titleController.dispose();
-    descriptionController.dispose();
+    _experienceController.dispose();
+    _descriptionController.dispose();
     super.dispose();
+  }
+
+  void _onSubmit() {
+    if (!_formKey.currentState!.validate()) return;
+    context.read<CreateWorkerProfileCubit>().createProfile(
+      categoryId: _selectedCategoryId,
+      experienceYears: int.parse(_experienceController.text.trim()),
+      isAvailable: _isAvailable,
+      description: _descriptionController.text.trim(),
+    );
   }
 
   @override
@@ -28,64 +45,168 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     final lang = S.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
-    return Scaffold(
-      appBar: CustomAppBar(title: lang.addService),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              CustomFormField(
-                controller: titleController,
-                hintText: lang.serviceTitle,
-              ),
-              const SizedBox(height: 16),
+    return BlocConsumer<CreateWorkerProfileCubit, CreateWorkerProfileState>(
+      listener: (context, state) {
+        if (state is CreateWorkerProfileSuccess) {
+          if (widget.pendingAuth != null) {
+            NavigationService.toMainScreen(context, widget.pendingAuth!);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(lang.profileCreatedMessage)),
+            );
+            Navigator.pop(context);
+          }
+        } else if (state is CreateWorkerProfileFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        final isLoading = state is CreateWorkerProfileLoading;
+        final categoriesState = context.watch<CategoriesCubit>().state;
 
-              CustomFormField(
-                controller: descriptionController,
-                hintText: lang.serviceDescription,
-              ),
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                child: CustomButton(
-                  text: lang.addService,
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      final title = titleController.text.trim();
-                      final description = descriptionController.text.trim();
-
-                      // استخدم description بعد كده مع API/Firebase
-                      debugPrint(description);
-
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: Text(lang.serviceAdded),
-                          content: Text(lang.serviceAddedMessage(title)),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(lang.ok),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  },
-                  backgroundColor: colorScheme.primary,
-                  textColor: colorScheme.onPrimary,
-                  height: 50,
-                ),
-              ),
-            ],
+        return Scaffold(
+          appBar: CustomAppBar(
+            title: widget.pendingAuth != null ? lang.createProfile : lang.addService,
           ),
-        ),
-      ),
+          backgroundColor: theme.scaffoldBackgroundColor,
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(lang.category, style: textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  if (categoriesState is CategoriesSuccess)
+                    DropdownButtonFormField<int>(
+                      decoration: InputDecoration(
+                        hintText: lang.selectCategory,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14,
+                        ),
+                      ),
+                      items: categoriesState.categories
+                          .where((c) => c.id != null)
+                          .map((c) => DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.name ?? ''),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedCategoryId = v),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: colorScheme.outline),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+
+                  Text(lang.yearsOfExperience, style: textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _experienceController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      hintText: lang.yearsOfExperience,
+                      suffixText: lang.years,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14,
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final n = int.tryParse(v.trim());
+                      if (n == null) return 'Enter a valid number';
+                      if (n < 0 || n > 50) return 'Must be between 0 and 50';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  Text(lang.description, style: textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _descriptionController,
+                    maxLines: 4,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      hintText: lang.descriptionHint,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SwitchListTile(
+                    title: Text(lang.availableForWork),
+                    value: _isAvailable,
+                    onChanged: (v) => setState(() => _isAvailable = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _onSubmit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 24, width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              widget.pendingAuth != null
+                                  ? lang.createProfile
+                                  : lang.addService,
+                              style: TextStyle(color: colorScheme.onPrimary),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -4,17 +4,25 @@ from datetime import datetime, timezone
 from django.conf import settings
 from django.db import transaction
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.notifications.models import Notification
+from apps.notifications.services import notify
 from apps.payments.models import CommissionPayment
 from apps.payments import paymob
 from apps.users.models import User
 from apps.workers.models import WorkerProfile
-from .models import Order
-from .serializers import OrderCreateSerializer, OrderSerializer
+from core.permissions import IsClient, IsWorker
+from core.throttling import OrderCreateThrottle
+from .models import Order, OrderAttachment
+from .serializers import (
+    OrderAttachmentSerializer,
+    OrderCreateSerializer,
+    OrderSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +32,10 @@ def now():
     return datetime.now(tz=timezone.utc)
 
 
-def send_notification(user, title, message, notif_type=Notification.IN_APP):
-    Notification.objects.create(
-        user=user, title=title, message=message, type=notif_type,
-    )
+def send_notification(user, title, message, notif_type=Notification.IN_APP, data=None):
+    """Thin wrapper kept for backwards-compat. Delegates to notifications.services.notify
+    which also fans out to FCM device tokens when registered."""
+    return notify(user=user, title=title, message=message, notif_type=notif_type, data=data)
 
 
 def authorize_commission(order):
@@ -54,22 +62,52 @@ def authorize_commission(order):
         )
         return None
 
+_AUDIO_EXTS = {"mp3", "m4a", "aac", "wav", "ogg", "opus", "amr"}
+_VIDEO_EXTS = {"mp4", "mov", "3gp", "webm", "mkv"}
+_IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "heic"}
+_MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _attachment_kind(name: str) -> str:
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if ext in _AUDIO_EXTS:
+        return OrderAttachment.KIND_AUDIO
+    if ext in _VIDEO_EXTS:
+        return OrderAttachment.KIND_VIDEO
+    return OrderAttachment.KIND_IMAGE
+
+
 #orders views
 class OrderListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_throttles(self):
+        if self.request.method == "POST":
+            return [OrderCreateThrottle()]
+        return super().get_throttles()
 
     def get(self, request):
         user = request.user
+        base = Order.objects.select_related(
+            "client", "worker", "service_category", "commission_payment",
+        )
         if user.role == User.Role.CLIENT:
-            orders = Order.objects.filter(client=user)
+            orders = base.filter(client=user)
         elif user.role == User.Role.WORKER:
-            orders = Order.objects.filter(worker=user)
+            orders = base.filter(worker=user)
         else:
-            orders = Order.objects.all()
-        return Response(OrderSerializer(orders, many=True).data)
+            orders = base.all()
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            orders = orders.filter(status=status_filter.upper())
+
+        return Response(OrderSerializer(orders, many=True, context={"request": request}).data)
 
     @transaction.atomic
     def post(self, request):
+        # Client-only enforced via per-method permission below
         if request.user.role != User.Role.CLIENT:
             return Response(
                 {"error": "Only clients can create orders."},
@@ -80,11 +118,34 @@ class OrderListCreateView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        vd = serializer.validated_data
         order = Order.objects.create(
             client=request.user,
-            service_category=serializer.validated_data["service_category"],
-            worker=serializer.validated_data.get("worker"),
+            service_category=vd["service_category"],
+            worker=vd.get("worker"),
+            description=vd.get("description", ""),
+            address_text=vd.get("address_text", ""),
+            latitude=vd.get("latitude"),
+            longitude=vd.get("longitude"),
+            urgency=vd.get("urgency", Order.URGENCY_NORMAL),
+            scheduled_for=vd.get("scheduled_for"),
         )
+
+        # Optional multipart attachments — sent under keys: attachments, photo, audio.
+        files = []
+        files += request.FILES.getlist("attachments")
+        files += request.FILES.getlist("photos")
+        files += request.FILES.getlist("photo")
+        files += request.FILES.getlist("audio")
+        for f in files:
+            if f.size > _MAX_ATTACHMENT_BYTES:
+                continue
+            OrderAttachment.objects.create(
+                order=order,
+                kind=_attachment_kind(f.name),
+                file=f,
+                duration_seconds=request.data.get("duration_seconds") if _attachment_kind(f.name) == OrderAttachment.KIND_AUDIO else None,
+            )
 
         payment_key = authorize_commission(order)
 
@@ -107,9 +168,61 @@ class OrderListCreateView(APIView):
 
             send_notification(wp.user, title=title, message=message, notif_type=Notification.PUSH)
 
-        response_data = OrderSerializer(order).data
+        response_data = OrderSerializer(order, context={"request": request}).data
         response_data["payment_key"] = payment_key
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class OrderAttachmentUploadView(APIView):
+    """POST /api/orders/<id>/attachments/ — add an attachment after order creation."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.client != request.user:
+            return Response(
+                {"error": "Only the order client can add attachments."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if order.status not in (Order.PENDING, Order.ACCEPTED):
+            return Response(
+                {"error": f"Cannot add attachments to a {order.status.lower()} order."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        files = list(request.FILES.values())
+        if not files:
+            return Response(
+                {"error": "No file uploaded. Use multipart/form-data with a file field."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        for f in files:
+            if f.size > _MAX_ATTACHMENT_BYTES:
+                return Response(
+                    {"error": f"Attachment '{f.name}' exceeds 15MB."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            att = OrderAttachment.objects.create(
+                order=order,
+                kind=_attachment_kind(f.name),
+                file=f,
+                caption=request.data.get("caption", ""),
+            )
+            created.append(att)
+
+        return Response(
+            OrderAttachmentSerializer(created, many=True, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class OrderDetailView(APIView):
@@ -131,7 +244,7 @@ class OrderDetailView(APIView):
         if request.user.role == User.Role.WORKER and order.worker != request.user:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={"request": request}).data)
 
 
 class OrderAcceptView(APIView):
@@ -189,7 +302,7 @@ class OrderAcceptView(APIView):
             message  = f"{request.user.username} accepted your order #{order.id}.",
             notif_type = Notification.PUSH,
         )
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={"request": request}).data)
 
 
 class OrderRejectView(APIView):
@@ -241,7 +354,7 @@ class OrderRejectView(APIView):
             title   = "Order Rejected ❌",
             message = f"Your order #{order.id} was rejected. We will try to find another worker.",
         )
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={"request": request}).data)
 
 
 class OrderCancelView(APIView):
@@ -295,7 +408,7 @@ class OrderCancelView(APIView):
                 title   = "Order Cancelled",
                 message = f"Order #{order.id} was cancelled by the client.",
             )
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={"request": request}).data)
 
 
 class OrderCompleteView(APIView):
@@ -338,4 +451,4 @@ class OrderCompleteView(APIView):
             message    = f"Order #{order.id} is done! Please leave a rating for the worker.",
             notif_type = Notification.PUSH,
         )
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={"request": request}).data)
