@@ -14,8 +14,6 @@ const menuItems = [
   { path: '/admin/payments', label: 'Payments', icon: 'bi-credit-card' },
 ];
 
-const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:8000/admin';
-
 const Sidebar = ({ isRtl }) => {
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -82,24 +80,6 @@ const Sidebar = ({ isRtl }) => {
             </NavLink>
           ))}
         </nav>
-      </div>
-
-      <div className="px-3 mt-3">
-        <p className="text-uppercase small text-white-50 mb-2 px-3" style={{ fontSize: '11px', letterSpacing: '1px' }}>
-          Django Admin
-        </p>
-        <a
-          href={`${ADMIN_URL}/users/user/`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nav-link d-flex align-items-center px-3 py-2.5 mb-1 rounded-3 text-white-50"
-          style={{ fontSize: '14px', transition: 'all 0.2s ease' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-        >
-          <i className="bi bi-shield-lock me-3 fs-5"></i>
-          Django Admin Panel
-        </a>
       </div>
 
       <div className="mt-auto p-3 border-top" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>

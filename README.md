@@ -128,7 +128,7 @@ docker compose exec web python manage.py shell
 ```
 
 Manage the data from the React dashboard (admin console) — visit
-<http://localhost:5173/admin/dashboard> after logging in as an admin.
+<http://localhost:5173/admin> after logging in as an admin.
 
 ### 5. Run the mobile app
 
@@ -156,6 +156,16 @@ npm run dev                # → http://localhost:5173
 ```
 
 The dev server proxies `/api` and `/media` to the Django backend on `127.0.0.1:8000`. Sign in with any user marked `role=admin` to reach `/admin` routes.
+
+**Live data sync.** Every admin screen polls the backend on a per-page
+interval and shows an "Updated Xs ago" badge. A mobile action (e.g. a
+client placing an order) lands in the dashboard within ~10 s; an admin
+action (e.g. flipping an order status) lands in the mobile app within
+~30 s via the order-list cubit poll and lights up the notification bell
+via the notification cubit poll. Status-change PATCHes also use
+optimistic updates so the admin doesn't wait a tick to see their click
+land. See [§ Live data sync in RUNNING.md](RUNNING.md) for the full
+matrix and the cache TTL.
 
 Production build:
 

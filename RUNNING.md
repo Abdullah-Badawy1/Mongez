@@ -68,7 +68,7 @@ You'll see this when it's done:
     admin  : admin1  / AdminPass123
 ```
 
-Open the dashboard, log in with `admin1` / `AdminPass123` → you land on `/admin/dashboard`.
+Open the dashboard, log in with `admin1` / `AdminPass123` → you land on `/admin`.
 
 To stop everything:
 
@@ -125,7 +125,7 @@ Visit:
 | <http://localhost:5173/> | Landing page (Hero, Services, How it works, Why choose, App promo, Footer) |
 | Top-right language toggle | Page flips between Arabic (RTL) and English (LTR) |
 | <http://localhost:5173/login> | Login form — sign in as `admin1` / `AdminPass123` |
-| <http://localhost:5173/admin/dashboard> | Stats cards + recent orders table |
+| <http://localhost:5173/admin> | Stats cards + recent orders table |
 | <http://localhost:5173/admin/users> | Paginated user list with `?role=` filter |
 | <http://localhost:5173/admin/workers> | Worker profiles with computed score |
 | <http://localhost:5173/admin/categories> | Service categories |
@@ -196,7 +196,7 @@ curl -s http://localhost:8000/api/health/
 # 2. Dashboard SPA shell loads
 curl -s -o /dev/null -w "/        → HTTP %{http_code}\n" http://localhost:5173/
 curl -s -o /dev/null -w "/login   → HTTP %{http_code}\n" http://localhost:5173/login
-curl -s -o /dev/null -w "/admin/dashboard → HTTP %{http_code}\n" http://localhost:5173/admin/dashboard
+curl -s -o /dev/null -w "/admin → HTTP %{http_code}\n" http://localhost:5173/admin
 
 # 3. End-to-end auth + admin endpoint (through the dev-server proxy,
 #    so this is exactly what the browser does)
@@ -240,7 +240,97 @@ seamlessly with the backend** — same code path the browser takes.
 
 ---
 
-## 5. Common quick recipes
+## 5. Live data sync — how the dashboard and mobile stay fresh
+
+There is no WebSocket layer. Both surfaces poll the same REST API on a
+per-page cadence; a tiny `usePolling` hook (front) and `Timer.periodic`
+(mobile) gate their fetches on visibility so an idle tab / backgrounded
+app stops hitting the API. Every page also shows an
+**"Updated X s ago"** badge with a manual refresh button.
+
+### 5.1 Dashboard → backend
+
+Each admin page polls on its own interval (chosen to match how dynamic
+the underlying data is) and pauses when the browser tab is hidden:
+
+| Page | Interval | Why |
+|---|---|---|
+| Dashboard | 10 s | primary "is the system breathing" surface |
+| Orders | 10 s | most dynamic — mobile-placed orders land fast |
+| Payments | 15 s | Paymob webhooks land out-of-band |
+| Workers | 30 s | profile changes are slow |
+| Users | 30 s | admin rarely watches the list move |
+| Ratings | 30 s | only fires on order-complete |
+| Categories | 60 s | basically static; parallel-admin safety net |
+
+* **Optimistic update** — `/admin/orders` flips a row's status in local
+  state the moment the admin clicks the dropdown, then PATCHes
+  `/api/admin/orders/<id>/status/`. If the PATCH fails the change is
+  reverted.
+* **Backend cache** — `/api/admin/dashboard/` caches its aggregate in
+  Django's cache for **5 s**, so N admins polling at 10 s each still
+  cost at most one DB query every other tick. Recent-orders stays
+  uncached because the serializer's URLs are per-request.
+
+### 5.2 Mobile → backend
+
+Three cubits run a 30 s `Timer.periodic` while a relevant screen is
+mounted:
+
+| Cubit | Screen | Endpoint |
+|---|---|---|
+| `NotificationCubit` | (global, started after login) | `GET /api/notifications/` |
+| `CustomerOrdersCubit` | "My requests" (client) | `GET /api/orders/` |
+| `TechnicianOrdersCubit` | "Incoming" / "Requests" (worker) | `GET /api/orders/` |
+
+A failed poll keeps the cached state on screen instead of flashing an
+error.
+
+### 5.3 Backend → mobile (when the admin acts)
+
+When an admin PATCHes an order status from the dashboard,
+`apps.admin_api.views.AdminOrderStatusView` fans the change out:
+
+* Writes a `Notification` row for the client.
+* Writes a `Notification` row for the assigned worker (if any).
+* Sends FCM push to both (best-effort; silent if `FCM_SERVER_KEY` is
+  unset).
+
+So the mobile sees an admin action through **two independent channels**
+— the order-list cubit picks up the new `status`, and the notification
+cubit picks up the new bell — plus instant FCM push when configured.
+No-op PATCHes (same status sent twice) don't fan out.
+
+End-to-end proof — copy/paste against a `--seed`'d stack:
+
+```bash
+ADMIN=$(curl -s -X POST localhost:8000/api/auth/login/ -H 'Content-Type: application/json' \
+  -d '{"username":"admin1","password":"AdminPass123"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["tokens"]["access"])')
+CLIENT=$(curl -s -X POST localhost:8000/api/auth/login/ -H 'Content-Type: application/json' \
+  -d '{"username":"client1","password":"ClientPass123"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["tokens"]["access"])')
+CAT=$(curl -s localhost:8000/api/categories/ | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')
+
+# Client places an order — status PENDING
+OID=$(curl -s -X POST localhost:8000/api/orders/ -H "Authorization: Bearer $CLIENT" \
+  -F "service_category=$CAT" -F "description=demo" -F "urgency=NORMAL" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+
+# Admin flips it to ACCEPTED from the dashboard
+curl -s -X PATCH "localhost:8000/api/admin/orders/$OID/status/" \
+  -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+  -d '{"status":"ACCEPTED"}'
+
+# Mobile picks up the new status and bell within 30 s — same endpoints the
+# CustomerOrdersCubit and NotificationCubit hit:
+curl -s localhost:8000/api/orders/ -H "Authorization: Bearer $CLIENT" | head -c 200
+curl -s localhost:8000/api/notifications/ -H "Authorization: Bearer $CLIENT" | head -c 200
+```
+
+---
+
+## 6. Common quick recipes
 
 ### Reset everything to a clean state
 
@@ -274,7 +364,7 @@ docker compose exec web python manage.py shell
 ### Run tests (matches CI)
 
 ```bash
-docker compose exec -T web python manage.py test apps        # backend (36 tests)
+docker compose exec -T web python manage.py test apps        # backend (39 tests)
 ( cd front  && npm run lint && npm run build )                # dashboard
 ( cd mobile && flutter analyze && flutter test )              # mobile
 ```
@@ -292,7 +382,7 @@ docker compose exec -T web python manage.py test apps        # backend (36 tests
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -307,7 +397,7 @@ docker compose exec -T web python manage.py test apps        # backend (36 tests
 
 ---
 
-## 7. What ships in each surface (quick map)
+## 8. What ships in each surface (quick map)
 
 ### Backend Django apps (`core/apps/`)
 
@@ -346,7 +436,7 @@ Sidebar links and routes match exactly. Wiring runs through
 
 ---
 
-## 8. Related docs
+## 9. Related docs
 
 | Need | Read |
 |---|---|

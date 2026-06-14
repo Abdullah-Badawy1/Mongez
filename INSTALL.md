@@ -113,7 +113,7 @@ these categories.
 
 ```bash
 docker compose exec web python manage.py test apps
-# Ran 36 tests in ~5s — OK
+# Ran 39 tests in ~5s — OK
 ```
 
 ---

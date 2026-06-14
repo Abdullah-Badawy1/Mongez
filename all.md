@@ -774,6 +774,56 @@ There's no shared code — the contract is the JSON over HTTP:
    `ProtectedRoute` + `AuthContext.isAdmin` only matters for UX, not
    security.
 
+### 8.1 Live data sync — there's no WebSocket layer
+
+Both surfaces poll the same REST API. The dashboard uses a tiny
+`usePolling` hook (`front/src/hooks/usePolling.js`); the mobile uses
+`Timer.periodic` inside the relevant cubits. Both gate fetches on
+visibility (browser tab) / cubit-screen lifecycle (mobile) so an idle
+client doesn't keep hammering the API.
+
+**Dashboard → backend (per-page intervals):**
+
+| Page | Interval | Why |
+|---|---|---|
+| Dashboard | 10 s | primary "is the system breathing" surface |
+| Orders | 10 s | most dynamic — mobile-placed orders land fast |
+| Payments | 15 s | Paymob webhooks land out-of-band |
+| Workers / Users / Ratings | 30 s | profile and review data is slow |
+| Categories | 60 s | basically static; parallel-admin safety net |
+
+* Each page shows an **"Updated X s ago"** badge with a manual refresh
+  button; the badge ticks each second via `useTimeAgo`.
+* `/admin/orders` does an **optimistic** local update on status PATCH
+  so the admin doesn't wait a poll cycle to see their click land.
+* `apps.admin_api.AdminDashboardView` caches its `Sum/Count` aggregate
+  in Django's cache for **5 s** so N admins polling at 10 s cost at
+  most one DB query every other tick. Recent-orders stays uncached
+  (per-request serializer URL context).
+
+**Mobile → backend (cubits):**
+
+| Cubit | When it polls | Endpoint | Interval |
+|---|---|---|---|
+| `NotificationCubit` | from login until app close | `/api/notifications/` | 30 s |
+| `CustomerOrdersCubit` | while "My requests" is mounted | `/api/orders/` | 30 s |
+| `TechnicianOrdersCubit` | while "Requests" is mounted | `/api/orders/` | 30 s |
+
+A failed poll keeps the cached state on screen instead of flashing an
+error.
+
+**Backend → mobile (when the admin acts):**
+
+`apps.admin_api.AdminOrderStatusView.patch` fans out on any status
+change (no-op PATCHes don't fan out):
+
+* `notify(order.client, …)` → in-app row + FCM push (best-effort)
+* `notify(order.worker, …)` → in-app row + FCM push, if assigned
+
+So a dashboard click lands in the mobile through **two independent
+channels** (orders cubit and notifications cubit) within ~30 s — plus
+instant FCM if `FCM_SERVER_KEY` is set.
+
 ---
 
 ## 9. Branch layout (matters for collaborators)

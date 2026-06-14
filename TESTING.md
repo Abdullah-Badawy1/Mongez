@@ -103,7 +103,7 @@ docker compose exec -T web python manage.py test apps --noinput
 **Expected (current count):**
 
 ```
-Ran 36 tests in ~5s
+Ran 39 tests in ~5s
 OK
 ```
 
@@ -219,7 +219,7 @@ Open <http://localhost:5173/>. Manual checklist (5 minutes):
 | Landing renders | Hero, Services, How it works, Why choose, App promo, Footer |
 | Toggle language (top right) | Page flips between Arabic (RTL) and English (LTR) |
 | Click **Login** | `/login` form |
-| Login as `admin1` / `AdminPass123` | Redirect to `/admin/dashboard` |
+| Login as `admin1` / `AdminPass123` | Redirect to `/admin` |
 | Admin dashboard | StatsCards populated, "Recent orders" table renders |
 | Sidebar → **Users** | List with `admin1`, `client1`, `worker1` and `?role=` filter works |
 | Sidebar → **Workers** | List with the seeded worker profile (or empty if none yet) |
@@ -317,7 +317,7 @@ This is the *"everything talks to everything"* test. ~10 minutes.
      route is what hooks into the JWT pair.)*
    * (Currently the SPA only ships the **admin** flow; client/worker
      flows happen in the mobile app — that's by design.)
-   * Open <http://localhost:5173/admin/dashboard> as `admin1`. Verify
+   * Open <http://localhost:5173/admin> as `admin1`. Verify
      the stats count includes the seeded users.
 
 7. **Place an order on mobile, observe it from the dashboard:**
@@ -339,7 +339,63 @@ is wired correctly.
 
 ---
 
-## 6. CI (what GitHub Actions runs on every push)
+## 6. Live data sync — exercise the cross-client refresh
+
+There's no WebSocket layer; both surfaces poll. This script proves the
+**dashboard ↔ mobile** loop end-to-end against `./start.sh --seed`.
+
+```bash
+ADMIN=$(curl -s -X POST localhost:8000/api/auth/login/ -H 'Content-Type: application/json' \
+  -d '{"username":"admin1","password":"AdminPass123"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["tokens"]["access"])')
+CLIENT=$(curl -s -X POST localhost:8000/api/auth/login/ -H 'Content-Type: application/json' \
+  -d '{"username":"client1","password":"ClientPass123"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["tokens"]["access"])')
+CAT=$(curl -s localhost:8000/api/categories/ | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')
+
+# 1. Mobile-side action — client places an order
+OID=$(curl -s -X POST localhost:8000/api/orders/ -H "Authorization: Bearer $CLIENT" \
+  -F "service_category=$CAT" -F "description=sync probe" -F "urgency=NORMAL" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+echo "client placed order #$OID (status PENDING)"
+
+# 2. Dashboard-side action — admin flips status
+curl -s -X PATCH "localhost:8000/api/admin/orders/$OID/status/" \
+  -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+  -d '{"status":"ACCEPTED"}' >/dev/null
+
+# 3. Mobile re-poll (CustomerOrdersCubit's 30 s loop hits this)
+STATUS=$(curl -s localhost:8000/api/orders/ -H "Authorization: Bearer $CLIENT" \
+  | python3 -c "import sys,json,os; d=json.load(sys.stdin); it=d if isinstance(d,list) else d.get('results',[]); o=next(x for x in it if x['id']==int(os.environ['OID'])); print(o['status'])" OID=$OID)
+echo "  → /api/orders/        status now = $STATUS"
+
+# 4. Mobile notification poll (NotificationCubit's 30 s loop hits this)
+N=$(curl -s localhost:8000/api/notifications/ -H "Authorization: Bearer $CLIENT" \
+  | python3 -c 'import sys,json; d=json.load(sys.stdin); it=d if isinstance(d,list) else d.get("results",[]); print(len(it))')
+echo "  → /api/notifications/ row count = $N (was 0 before admin acted)"
+```
+
+Expected:
+
+```
+client placed order #XX (status PENDING)
+  → /api/orders/        status now = ACCEPTED
+  → /api/notifications/ row count = 1   (or more if other tests ran first)
+```
+
+**What it proves:** the dashboard PATCH on `/admin/orders/<id>/status/`
+triggers two writes (order row + Notification rows for the client and
+the worker) so the mobile sees the change via both its order-list cubit
+poll AND its notification cubit poll. If FCM is configured a push fires
+too.
+
+Browser-side check — open `/admin/orders` in two browser tabs, change a
+status in one. The other tab's row should flip within 10 s without
+manual refresh, and the "Updated X s ago" badge in the corner ticks up.
+
+---
+
+## 7. CI (what GitHub Actions runs on every push)
 
 The workflow at `.github/workflows/` runs roughly the same backend
 suite headlessly. To replicate locally:
@@ -353,7 +409,7 @@ differences caught by step §2.4 manual probes).
 
 ---
 
-## 7. Troubleshooting test failures
+## 8. Troubleshooting test failures
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -366,7 +422,7 @@ differences caught by step §2.4 manual probes).
 
 ---
 
-## 8. Cheat sheet — copy/paste block
+## 9. Cheat sheet — copy/paste block
 
 ```bash
 # everything, from scratch

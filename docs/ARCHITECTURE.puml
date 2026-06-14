@@ -15,7 +15,8 @@
 '           mongez-flow-login          (4) Sequence: login + role redirect
 '           mongez-flow-order          (5) Sequence: client places an order
 '           mongez-flow-admin          (6) Sequence: admin dashboard load
-'           mongez-states-order        (7) State machine: Order lifecycle
+'           mongez-flow-live-sync      (7) Sequence: admin → mobile live data sync
+'           mongez-states-order        (8) State machine: Order lifecycle
 '================================================================
 
 '----------------------------------------------------------------
@@ -387,7 +388,57 @@ ax --> ui   : populate <StatsCards/> + <Table/>
 
 
 '----------------------------------------------------------------
-'  7. State machine — Order lifecycle
+'  7. Sequence — admin → mobile live data sync
+'----------------------------------------------------------------
+
+@startuml mongez-flow-live-sync
+
+skinparam defaultFontName "Inter"
+skinparam roundCorner 8
+skinparam SequenceArrowColor #3498db
+
+actor "Admin"        as a
+participant "Dashboard\n(/admin/orders, usePolling 10 s)"  as ui
+participant "PATCH /api/admin/orders/<id>/status/"          as ep
+participant "AdminOrderStatusView"                          as view
+participant "Order ORM"                                     as orm
+participant "notify()\napps.notifications.services"         as notif
+queue       "FCM\n(optional)"                              as fcm
+participant "Mobile\nCustomerOrdersCubit (30 s poll)"      as moq
+participant "Mobile\nNotificationCubit (30 s poll)"        as mon
+
+a -> ui : pick "ACCEPTED" in dropdown
+ui -> ui : **optimistic** local update (row flips)
+ui -> ep : PATCH {status: ACCEPTED}
+ep -> view : IsAuthenticated + role==ADMIN
+view -> orm : order.status = ACCEPTED\n(+ accepted_at = now)
+view -> notif : notify(client, …, PUSH)
+notif -> orm : Notification row (client)
+notif --> fcm : push (best-effort)
+view -> notif : notify(worker, …, PUSH)
+notif -> orm : Notification row (worker)
+notif --> fcm : push (best-effort)
+view --> ep : 200 { order }
+ep --> ui : 200 (confirms optimistic update)
+
+== within 30 s ==
+
+moq -> ep : GET /api/orders/
+moq <-- ep : 200 [ …, order with status ACCEPTED ]
+mon -> ep : GET /api/notifications/
+mon <-- ep : 200 [ …, "Order #X — accepted" ]
+
+note over moq, mon
+  Even without FCM, the mobile picks up the dashboard
+  click via these two independent cubit polls. With
+  FCM_SERVER_KEY set, the bell lights up instantly.
+end note
+
+@enduml
+
+
+'----------------------------------------------------------------
+'  8. State machine — Order lifecycle
 '----------------------------------------------------------------
 
 @startuml mongez-states-order
