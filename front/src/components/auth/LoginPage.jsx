@@ -3,8 +3,6 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/images/a.png';
 
-const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:8000/admin';
-
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,31 +13,21 @@ const LoginPage = () => {
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/admin';
-  console.log('[LoginPage] Rendered, from:', from, 'state:', location.state);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    console.log('[LoginPage] Submit clicked for:', username);
 
     if (!username.trim() || !password.trim()) {
       setError('Please enter username and password');
       return;
     }
 
-    console.log('[LoginPage] Calling login...');
     const result = await login(username, password);
-    console.log('[LoginPage] Login result:', result);
 
     if (result.success) {
-      console.log('[LoginPage] Success! Navigating to:', from);
-
-      const token = localStorage.getItem('accessToken');
-      console.log('[LoginPage] Token in localStorage after login:', !!token);
-
       navigate(from, { replace: true });
     } else {
-      console.error('[LoginPage] Login failed:', result.message);
       setError(result.message);
     }
   };
@@ -120,19 +108,6 @@ const LoginPage = () => {
             )}
           </button>
         </form>
-
-        <div className="text-center mt-4">
-          <a
-            href={ADMIN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-decoration-none"
-            style={{ color: '#667eea', fontSize: '14px' }}
-          >
-            <i className="bi bi-shield-lock me-1"></i>
-            Go to Django Admin Panel
-          </a>
-        </div>
 
         <hr className="my-3" />
 

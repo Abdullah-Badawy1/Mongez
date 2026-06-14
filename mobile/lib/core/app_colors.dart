@@ -75,35 +75,13 @@ class AppColors {
   static const Color danger  = Color(0xFFE74C3C);  // --mongez-danger
   static const Color info    = Color(0xFF2980B9);  // primaryDark sibling
 
-  // ── Legacy aliases ─────────────────────────────────────────────────────
-  // Kept so screens still compile while the rename rolls through the app.
+  // ── Legacy aliases still referenced by some widgets ───────────────────
+  // Only the names with actual call sites are kept — every removed alias
+  // had zero usages.
   static const Color white = Color(0xFFFFFFFF);
-  static const Color categoryCard = primaryContainer;
-  static const Color softPrimary = primarySoft;
-  static const Color hardPrimary = primaryDark;
-  static const Color primary1 = primary;
-
   static const Color gray9 = textPrimary;
-  static const Color gray8 = Color(0xFF34495E);
-  static const Color gray7 = textSecondary;
-  static const Color gray6 = Color(0xFF7B8A8B);
-  static const Color gray5 = textTertiary;
-  static const Color gray4 = Color(0xFFA6ACAF);
   static const Color gray3 = outlineStrong;
   static const Color gray2 = Color(0xFFD5DBDB);
-  static const Color gray1 = outline;
-  static const Color gray05 = surfaceMuted;
-
-  static const Color blueGray9 = textPrimary;
-  static const Color blueGray8 = Color(0xFF34495E);
-  static const Color blueGray7 = textSecondary;
-  static const Color blueGray6 = Color(0xFF7B8A8B);
-  static const Color blueGray5 = textTertiary;
-  static const Color blueGray4 = Color(0xFFA6ACAF);
-  static const Color blueGray3 = outlineStrong;
-  static const Color blueGray2 = Color(0xFFD5DBDB);
-  static const Color blueGray1 = surfaceVariant;
-  static const Color blueGray05 = surfaceMuted;
 }
 
 /// Pre-baked gradients for buttons, banners, cards.

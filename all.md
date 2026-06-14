@@ -56,7 +56,7 @@ Mongez/
 │       ├── services/api.js          · axios client + JWT auto-refresh
 │       ├── context/AuthContext.jsx  · session state + token storage
 │       ├── routes/                  · AppRoutes, ProtectedRoute, PublicRoute
-│       ├── pages/                   · LandingPage, Login, ResetPassword, NotFound
+│       ├── pages/                   · LandingPage, Login, NotFound
 │       │   └── admin/               · Dashboard, Users, Workers, Categories,
 │       │                             Orders, Payments, Ratings
 │       └── components/
@@ -103,7 +103,7 @@ Mongez/
 ├── .env.example
 ├── manage.py
 ├── README.md · INSTALL.md · API_links.md · CONTRIBUTING.md
-└── PROJECT_OVERVIEW.md · ENHANCEMENTS.md · DOCKER_VERIFICATION.md · CLOUD_SERVICES.md
+└── RUNNING.md · TESTING.md · WINDOWS.md · all.md · docs/ARCHITECTURE.{md,puml}
 ```
 
 The working mobile app is everything under `mobile/`. The working
@@ -580,7 +580,7 @@ front/src/
 │   └── PublicRoute.jsx    ← redirects authed admins to /admin
 ├── pages/
 │   ├── LandingPage.jsx + Landing.css    ← marketing site
-│   ├── Login.jsx · ResetPassword.jsx · NotFound.jsx
+│   ├── Login.jsx · NotFound.jsx
 │   ├── AdminDashboard.jsx               ← stats home
 │   └── admin/
 │       ├── Dashboard.jsx · Users.jsx · Workers.jsx

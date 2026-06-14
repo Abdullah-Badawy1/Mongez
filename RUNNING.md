@@ -328,7 +328,6 @@ docker compose exec -T web python manage.py test apps        # backend (36 tests
 |---|---|
 | `/` | `LandingPage.jsx` (uses every component under `components/landing/` and `components/layout/`) |
 | `/login` | `Login.jsx` → `components/auth/LoginPage.jsx` (uses `AuthContext.login()`) |
-| `/reset-password` | `ResetPassword.jsx` |
 | `/admin/dashboard` | `pages/admin/Dashboard.jsx` (calls `GET /api/admin/dashboard/`) |
 | `/admin/users` | `pages/admin/Users.jsx` (`GET /api/admin/users/`) |
 | `/admin/workers` | `pages/admin/Workers.jsx` (`GET /api/admin/workers/`) |
