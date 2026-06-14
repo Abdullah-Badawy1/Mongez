@@ -76,3 +76,30 @@ class AdminApiAccessControlTests(TestCase):
         body = response.json()
         self.assertEqual(body["count"], 1)
         self.assertEqual(body["results"][0]["role"], "client")
+
+    def test_worker_list_handles_users_without_profile(self):
+        """Regression: AdminWorkerListView used to reference
+        WorkerProfile.category / .description which don't exist on the
+        current model, 500ing on the first worker without a profile."""
+        # Add one worker without a WorkerProfile — this is the case that
+        # used to trigger the 500.
+        from apps.users.models import User
+        User.objects.create_user(
+            username="bare_worker",
+            phone="01000000077",
+            password="WorkerPass123",
+            role=User.Role.WORKER,
+        )
+        self._auth_as(self.admin)
+        response = self.api.get(reverse("admin-worker-list"))
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.json()
+        self.assertGreaterEqual(body["count"], 1)
+        # Required fields the dashboard reads — would KeyError otherwise.
+        row = body["results"][0]
+        for key in (
+            "id", "user", "profession", "description",
+            "experience_years", "average_rating", "completed_jobs",
+            "is_available", "score", "has_profile",
+        ):
+            self.assertIn(key, row, f"missing field: {key}")

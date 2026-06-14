@@ -254,12 +254,19 @@ class AdminWorkerListView(APIView):
             results.append({
                 "id": profile.id if profile else None,
                 "user": UserSerializer(u, context={"request": request}).data,
-                "category": ServiceCategorySerializer(profile.category).data if profile and profile.category else None,
-                "description": profile.description if profile else "",
+                # WorkerProfile.profession is a free-text trade label
+                # ("Plumber", "Electrician", …) — the dashboard treats
+                # it the same way an old `category.name` was used.
+                "profession": profile.profession if profile else "",
+                "profession_ar": profile.profession_ar if profile else "",
+                "description": profile.bio if profile else "",
+                "description_ar": profile.bio_ar if profile else "",
                 "experience_years": profile.experience_years if profile else 0,
                 "average_rating": profile.average_rating if profile else 0.0,
                 "completed_jobs": profile.completed_jobs if profile else 0,
+                "accept_rate": profile.accept_rate if profile else 0.0,
                 "is_available": profile.is_available if profile else False,
+                "is_verified": profile.is_verified if profile else False,
                 "score": round(profile.calculate_score(), 2) if profile else 0.0,
                 "created_at": profile.created_at.isoformat() if profile and profile.created_at else u.date_joined.isoformat(),
                 "has_profile": profile is not None,
@@ -280,7 +287,7 @@ class AdminWorkerDetailView(APIView):
         if request.user.role != User.Role.ADMIN:
             return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
         try:
-            profile = WorkerProfile.objects.select_related("user", "category").get(pk=pk)
+            profile = WorkerProfile.objects.select_related("user").get(pk=pk)
         except WorkerProfile.DoesNotExist:
             return Response({"error": "Worker not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(WorkerProfileSerializer(profile, context={"request": request}).data)
