@@ -18,15 +18,24 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  // Full display name — any unicode, can have spaces. Goes to the backend
+  // as `name_ar` (which the User model treats as the display name).
   final TextEditingController nameController = TextEditingController();
+  // Login handle — Django's UnicodeUsernameValidator only allows
+  // letters / digits / `@.+-_`, no spaces. Kept separate from the
+  // display name so users can pick the friendly form for both.
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   String _selectedRole = 'client';
 
+  static final RegExp _usernameRegex = RegExp(r'^[A-Za-z0-9_.@+\-]+$');
+
   @override
   void dispose() {
     nameController.dispose();
+    usernameController.dispose();
     phoneController.dispose();
     addressController.dispose();
     passwordController.dispose();
@@ -111,7 +120,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 24),
 
-                    /// Username Field
+                    /// Full Name field — display name (spaces / Arabic OK)
                     CustomFormField(
                       controller: nameController,
                       hintText: lang.fullName,
@@ -120,8 +129,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: textTheme.bodySmall?.color,
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
+                        if (value == null || value.trim().isEmpty) {
                           return lang.pleaseEnterYourName;
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    /// Username field — login handle, no spaces.
+                    CustomFormField(
+                      controller: usernameController,
+                      hintText: 'Username (no spaces)',
+                      preIcon: Icon(
+                        Icons.alternate_email,
+                        color: textTheme.bodySmall?.color,
+                      ),
+                      validator: (value) {
+                        final v = value?.trim() ?? '';
+                        if (v.isEmpty) {
+                          return 'Please enter a username';
+                        }
+                        if (v.contains(' ')) {
+                          return 'Username cannot contain spaces';
+                        }
+                        if (!_usernameRegex.hasMatch(v)) {
+                          return 'Use letters, numbers, or _ . + - @';
+                        }
+                        if (v.length < 3) {
+                          return 'Username is too short';
                         }
                         return null;
                       },
@@ -149,7 +185,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    /// Address Field
+                    /// Address Field — optional on the backend, but UX
+                    /// asks for it so workers and clients have something
+                    /// the dashboard can show.
                     CustomFormField(
                       controller: addressController,
                       hintText: lang.address,
@@ -158,8 +196,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: textTheme.bodySmall?.color,
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return lang.pleaseEnterYourPhoneNumber;
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your address';
                         }
                         return null;
                       },
@@ -195,7 +233,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             onPressed: () {
                               if (_formKey.currentState!.validate()) {
                                 cubit.register(
-                                  userName: nameController.text.trim(),
+                                  userName: usernameController.text.trim(),
+                                  name: nameController.text.trim(),
                                   password: passwordController.text.trim(),
                                   address: addressController.text.trim(),
                                   phone: phoneController.text.trim(),

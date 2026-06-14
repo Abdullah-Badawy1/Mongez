@@ -30,13 +30,25 @@ class ServerFailure extends Failure {
 
         if (data is Map) {
           if (data.containsKey('non_field_errors')) {
-            message = data['non_field_errors'][0];
+            message = _firstString(data['non_field_errors']);
           } else if (data.containsKey('detail')) {
-            message = data['detail'];
+            message = data['detail'].toString();
           } else {
-            message = data.values.first is List
-                ? data.values.first[0]
-                : data.values.first.toString();
+            // Field-level DRF validation errors look like
+            //   {"username": ["..."], "phone": ["..."]}.
+            // Joining "<field>: <msg>" makes it obvious which input
+            // failed — the previous code surfaced just "this field is
+            // required" with no hint about which field.
+            final lines = <String>[];
+            data.forEach((field, value) {
+              final msg = _firstString(value);
+              if (msg.isNotEmpty) {
+                lines.add(field == 'non_field_errors'
+                    ? msg
+                    : '$field: $msg');
+              }
+            });
+            if (lines.isNotEmpty) message = lines.join('\n');
           }
         }
 
@@ -50,5 +62,12 @@ class ServerFailure extends Failure {
       default:
         return ServerFailure(errorMessage: "Unexpected error occurred");
     }
+  }
+
+  static String _firstString(dynamic v) {
+    if (v == null) return '';
+    if (v is String) return v;
+    if (v is List && v.isNotEmpty) return _firstString(v.first);
+    return v.toString();
   }
 }

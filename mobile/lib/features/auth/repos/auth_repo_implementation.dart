@@ -46,20 +46,26 @@ class AuthRepoImplementation implements AuthRepo {
   @override
   Future<Either<Failure, Auth>> register({
     required String userName,
+    required String name,
     required String password,
-    required String address,
     required String phone,
     required String role,
+    String address = "",
     Uint8List? profileImageBytes,
   }) async {
     try {
       final Map<String, dynamic> body = {
         "username": userName,
+        // Backend stores the human display name in `name_ar`; the field
+        // accepts any unicode (Arabic or Latin, with spaces).
+        "name_ar": name,
         "password": password,
-        "address": address,
         "phone": phone,
         "role": role,
       };
+      if (address.isNotEmpty) {
+        body["address"] = address;
+      }
 
       late Map<String, dynamic> data;
 

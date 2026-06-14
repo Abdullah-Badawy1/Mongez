@@ -10,10 +10,11 @@ abstract class AuthRepo {
   });
   Future<Either<Failure, Auth>> register({
     required String userName,
+    required String name,
     required String password,
-    required String address,
     required String phone,
     required String role,
+    String address,
     Uint8List? profileImageBytes,
   });
 }
