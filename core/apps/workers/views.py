@@ -1,5 +1,6 @@
 from django.db.models import Avg, Count, F, FloatField, Q
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -202,6 +203,85 @@ class WorkerStatsView(APIView):
                 "distribution": distribution,
             },
             "score": round(profile.calculate_score(), 2),
+        })
+
+
+class MyWorkerStatsView(APIView):
+    """GET /api/workers/me/stats/ — performance summary for the
+    currently-authenticated worker. Powers the dashboard card on the
+    new mobile worker home screen.
+
+    Returns counts (lifetime + this-month) for the things a worker
+    actually cares about — completed jobs, pending requests, current
+    average rating, last few customer reviews. There is no money
+    figure: the platform takes a commission at order time but the
+    job cash itself is settled in person.
+    """
+
+    permission_classes = [IsAuthenticated, IsWorker]
+
+    def get(self, request):
+        user = request.user
+        profile = getattr(user, "worker_profile", None)
+        if profile is None:
+            return Response(
+                {"error": "Set up your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        now = timezone.now()
+        month_start = now.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0,
+        )
+
+        all_orders = Order.objects.filter(worker=user)
+        month_orders = all_orders.filter(created_at__gte=month_start)
+
+        lifetime = all_orders.aggregate(
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=Order.COMPLETED)),
+            accepted=Count("id", filter=Q(status=Order.ACCEPTED)),
+            pending=Count("id", filter=Q(status=Order.PENDING)),
+            rejected=Count("id", filter=Q(status=Order.REJECTED)),
+            cancelled=Count("id", filter=Q(status=Order.CANCELLED)),
+        )
+        this_month = month_orders.aggregate(
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=Order.COMPLETED)),
+        )
+
+        recent_ratings = list(
+            Rating.objects.filter(worker=user)
+            .select_related("client")
+            .order_by("-created_at")
+            .values("stars", "review", "created_at", "client__username")[:5]
+        )
+        for r in recent_ratings:
+            r["created_at"] = r["created_at"].isoformat()
+            r["client_username"] = r.pop("client__username")
+
+        return Response({
+            "profile": {
+                "id": profile.id,
+                "profession": profile.profession,
+                "profession_ar": profile.profession_ar,
+                "is_available": profile.is_available,
+                "is_verified": profile.is_verified,
+                "average_rating": round(profile.average_rating or 0, 2),
+            },
+            "lifetime": {
+                "orders": lifetime["total"] or 0,
+                "completed_jobs": lifetime["completed"] or 0,
+                "accepted_jobs": lifetime["accepted"] or 0,
+                "pending_requests": lifetime["pending"] or 0,
+                "rejected": lifetime["rejected"] or 0,
+                "cancelled": lifetime["cancelled"] or 0,
+            },
+            "this_month": {
+                "orders": this_month["total"] or 0,
+                "completed_jobs": this_month["completed"] or 0,
+            },
+            "recent_ratings": recent_ratings,
         })
 
 

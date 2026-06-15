@@ -13,6 +13,7 @@ import 'package:mongez/features/orders/presentation/cubit/job_history_cubit.dart
 import 'package:mongez/features/orders/presentation/cubit/technician_orders_cubit.dart';
 import 'package:mongez/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:mongez/features/workers/presentation/cubit/create_worker_profile_cubit.dart';
+import 'package:mongez/features/workers/presentation/cubit/worker_stats_cubit.dart';
 import 'package:mongez/features/workers/presentation/cubit/workers_cubit.dart';
 import 'package:mongez/services/helper.dart';
 
@@ -58,6 +59,7 @@ class NavigationService {
     context.read<RegisterCubit>().reset();
     context.read<CheckoutCubit>().reset();
     context.read<CreateWorkerProfileCubit>().reset();
+    context.read<WorkerStatsCubit>().reset();
   }
 
   static void _fetchFreshData(BuildContext context) {

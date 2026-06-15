@@ -27,6 +27,7 @@ import 'package:mongez/features/orders/domain/order_repository.dart';
 import 'package:mongez/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:mongez/features/profile/domain/profile_repository.dart';
 import 'package:mongez/features/workers/presentation/cubit/create_worker_profile_cubit.dart';
+import 'package:mongez/features/workers/presentation/cubit/worker_stats_cubit.dart';
 import 'package:mongez/features/workers/presentation/cubit/workers_cubit.dart';
 import 'package:mongez/features/workers/domain/worker_repository.dart';
 import 'package:mongez/generated/l10n.dart';
@@ -104,6 +105,14 @@ class MyApp extends StatelessWidget {
             ),
             BlocProvider(
               create: (context) => CreateWorkerProfileCubit(
+                workerRepository: getIt.get<WorkerRepository>(),
+              ),
+            ),
+            // Worker stats — loaded lazily on the worker home screen
+            // (the request 404s for client/admin users, so we don't
+            // hit it eagerly here).
+            BlocProvider(
+              create: (context) => WorkerStatsCubit(
                 workerRepository: getIt.get<WorkerRepository>(),
               ),
             ),

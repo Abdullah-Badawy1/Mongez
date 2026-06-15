@@ -21,6 +21,10 @@ class Endpoints {
   static const String workers = 'workers/';
   static const String workersCreate = 'workers/create/';
   static const String workersMe = 'workers/me/';
+  // Performance summary for the logged-in worker: lifetime + this-month
+  // counts, recent ratings, availability flag. Powers the dashboard
+  // card on the WorkerHomeScreen.
+  static const String workersMyStats = 'workers/me/stats/';
   static String workerById(int id) => 'workers/$id/';
   // Backend serves the calling worker's own profile (includes averageRating
   // + completedJobs) at /workers/me/. There is no dedicated "my-ratings"

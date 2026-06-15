@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:mongez/core/constants/endpoints.dart';
 import 'package:mongez/errors/failure.dart';
 import 'package:mongez/features/workers/data/models/worker_model.dart';
+import 'package:mongez/features/workers/data/models/worker_stats.dart';
 import 'package:mongez/features/workers/domain/worker_repository.dart';
 import 'package:mongez/services/api_service.dart';
 
@@ -76,6 +77,38 @@ class WorkerRepositoryImpl implements WorkerRepository {
         body: body,
       );
       return right(WorkerModel.fromJson(data));
+    } catch (e) {
+      if (e is DioException) {
+        return left(ServerFailure.fromDioException(e));
+      }
+      return left(ServerFailure(errorMessage: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, WorkerStats>> getMyStats() async {
+    try {
+      final data = await apiService.get(endPoint: Endpoints.workersMyStats);
+      return right(WorkerStats.fromJson(data as Map<String, dynamic>));
+    } catch (e) {
+      if (e is DioException) {
+        return left(ServerFailure.fromDioException(e));
+      }
+      return left(ServerFailure(errorMessage: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> setAvailability(bool isAvailable) async {
+    try {
+      final data = await apiService.patch(
+        endPoint: Endpoints.workersMe,
+        body: {'is_available': isAvailable},
+      );
+      // Backend echoes the full WorkerProfileSerializer; we only need the
+      // bool back for the cubit to confirm.
+      final updated = (data as Map<String, dynamic>)['is_available'] as bool?;
+      return right(updated ?? isAvailable);
     } catch (e) {
       if (e is DioException) {
         return left(ServerFailure.fromDioException(e));

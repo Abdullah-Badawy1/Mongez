@@ -272,11 +272,29 @@ class AdminWorkerListView(APIView):
             return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
 
         search = request.query_params.get("search", "")
+        status_filter = (request.query_params.get("status") or "").lower()
+
         queryset = User.objects.filter(role=User.Role.WORKER)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search) | Q(phone__icontains=search)
             )
+
+        # `?status=complete`   → only workers who finished AddService
+        # `?status=incomplete` → registered worker accounts without a profile
+        # (anything else)      → both
+        if status_filter == "complete":
+            queryset = queryset.filter(worker_profile__isnull=False)
+        elif status_filter == "incomplete":
+            queryset = queryset.filter(worker_profile__isnull=True)
+
+        # Counts for the dashboard banner — cheap on this scale.
+        complete_count = User.objects.filter(
+            role=User.Role.WORKER, worker_profile__isnull=False,
+        ).count()
+        incomplete_count = User.objects.filter(
+            role=User.Role.WORKER, worker_profile__isnull=True,
+        ).count()
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 50))
@@ -313,6 +331,8 @@ class AdminWorkerListView(APIView):
             "count": total,
             "page": page,
             "page_size": page_size,
+            "complete_count": complete_count,
+            "incomplete_count": incomplete_count,
             "results": results,
         })
 
