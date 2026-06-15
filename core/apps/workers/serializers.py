@@ -85,12 +85,45 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
 
 
 class WorkerProfileWriteSerializer(serializers.ModelSerializer):
+    """Used by `POST /api/workers/create/` and `PATCH /api/workers/me/`.
+
+    Accepts either of two payload shapes, since the mobile and the
+    dashboard happen to send slightly different things:
+
+      * canonical write shape — `profession` (free-text trade label),
+        `bio`, …
+      * mobile sign-up shape — `category_id` (FK into ServiceCategory)
+        plus `description`.
+
+    `category_id` gets translated into `profession` + `profession_ar`
+    by looking the ServiceCategory up server-side, which is the single
+    source of truth for the list. `description` is just a friendlier
+    alias for `bio`.
+    """
+
+    # Write-only aliases — they never appear in the response shape
+    # (read-side uses WorkerProfileSerializer).
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=ServiceCategory.objects.all(),
+        write_only=True,
+        required=False,
+        help_text="ServiceCategory id; copied into profession + profession_ar.",
+    )
+    description = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text="Friendly alias for `bio`. Useful so the mobile and the "
+                  "admin dashboard can send the same field name.",
+    )
 
     class Meta:
         model = WorkerProfile
         fields = [
             "profession", "profession_ar",
+            "category_id",
             "bio", "bio_ar",
+            "description",
             "experience_years",
             "hourly_rate", "minimum_charge",
             "specialties", "specialties_ar",
@@ -100,6 +133,11 @@ class WorkerProfileWriteSerializer(serializers.ModelSerializer):
             "latitude", "longitude", "service_radius_km",
             "is_available",
         ]
+        extra_kwargs = {
+            # Required only when the caller didn't send `category_id`.
+            # We enforce that in `validate()`.
+            "profession": {"required": False, "allow_blank": True},
+        }
 
     def validate_experience_years(self, value):
         if value > 80:
@@ -115,6 +153,24 @@ class WorkerProfileWriteSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if self.instance is None and hasattr(user, "worker_profile"):
             raise serializers.ValidationError("You already have a worker profile.")
+
+        # Translate the friendly aliases into the underlying model fields.
+        category = attrs.pop("category_id", None)
+        description = attrs.pop("description", None)
+        if category is not None:
+            attrs["profession"] = category.name
+            if category.name_ar and not attrs.get("profession_ar"):
+                attrs["profession_ar"] = category.name_ar
+        if description is not None and not attrs.get("bio"):
+            attrs["bio"] = description
+
+        # On create, profession must come from somewhere — either the
+        # category lookup or the raw `profession` field.
+        if self.instance is None and not attrs.get("profession"):
+            raise serializers.ValidationError({
+                "category_id": "Please pick a service category (or send "
+                               "`profession` directly).",
+            })
         return attrs
 
     def create(self, validated_data):

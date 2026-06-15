@@ -100,3 +100,48 @@ class WorkerProfileWriteTests(APITestCase):
         }, format="json")
         self.assertEqual(patch_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(patch_resp.data["experience_years"], 6)
+
+    def test_worker_can_create_with_category_id_and_description(self):
+        """The mobile sends {category_id, description, experience_years,
+        is_available} — make sure that shape produces a valid worker
+        profile (profession copied from category.name, bio copied from
+        description)."""
+        from .models import ServiceCategory
+        category = ServiceCategory.objects.create(
+            name="Plumber", name_ar="سباك",
+        )
+        worker = User.objects.create_user(
+            username="hassan_plumber",
+            phone="+201000000077",
+            password="Sup3r-Secret!",
+            role=User.Role.WORKER,
+        )
+        self.client.force_authenticate(user=worker)
+        resp = self.client.post(reverse("worker-create"), {
+            "category_id": category.id,
+            "description": "Quick & honest fixes",
+            "experience_years": 7,
+            "is_available": True,
+        }, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data["profession"], "Plumber")
+        self.assertEqual(resp.data["profession_ar"], "سباك")
+        self.assertEqual(resp.data["bio"], "Quick & honest fixes")
+        self.assertEqual(resp.data["experience_years"], 7)
+
+    def test_worker_create_without_category_or_profession_returns_clear_400(self):
+        worker = User.objects.create_user(
+            username="confused_worker",
+            phone="+201000000088",
+            password="Sup3r-Secret!",
+            role=User.Role.WORKER,
+        )
+        self.client.force_authenticate(user=worker)
+        resp = self.client.post(reverse("worker-create"), {
+            "experience_years": 3,
+        }, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Either field key is fine — what matters is the message hints at
+        # picking a category.
+        flat = str(resp.data).lower()
+        self.assertIn("category", flat)
