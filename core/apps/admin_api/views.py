@@ -357,5 +357,16 @@ class AdminRatingListView(APIView):
         if request.user.role != User.Role.ADMIN:
             return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
 
-        ratings = Rating.objects.select_related("client", "worker", "order").all().order_by("-created_at")
-        return Response(RatingSerializer(ratings, many=True, context={"request": request}).data)
+        from apps.ratings.serializers import AdminRatingSerializer
+        ratings = (
+            Rating.objects
+            .select_related(
+                "client", "worker", "worker__worker_profile",
+                "order", "order__service_category",
+            )
+            .all()
+            .order_by("-created_at")
+        )
+        return Response(
+            AdminRatingSerializer(ratings, many=True, context={"request": request}).data,
+        )

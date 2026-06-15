@@ -55,6 +55,30 @@ class RatingSerializer(serializers.ModelSerializer):
         profile.average_rating = round(new_avg, 2)
         profile.save()
 
+        # Tell the worker — same fan-out the admin status-change uses.
+        # In-app row + FCM push (best-effort if FCM_SERVER_KEY is set).
+        # Wrapped so a notify() exception never blocks the 201 reply.
+        try:
+            from apps.notifications.services import notify
+            from apps.notifications.models import Notification
+
+            stars = rating.stars
+            client_label = client.name_ar or client.username
+            notify(
+                worker,
+                f"{stars}-star rating from {client_label}",
+                rating.review or f"You got a {stars}-star rating on order #{order.id}.",
+                notif_type=Notification.PUSH,
+                data={
+                    "kind": "rating",
+                    "order_id": order.id,
+                    "rating_id": rating.id,
+                    "stars": stars,
+                },
+            )
+        except Exception:  # pragma: no cover — best-effort
+            pass
+
         return rating
 
 
@@ -67,3 +91,44 @@ class WorkerRatingSerializer(serializers.ModelSerializer):
         model = Rating
         fields = ["id", "client_name", "stars", "review", "created_at"]
         read_only_fields = fields
+
+
+class AdminRatingSerializer(serializers.ModelSerializer):
+    """Dashboard projection — every column the Ratings page renders.
+
+    The base `RatingSerializer` only exposes ids; the admin needs the
+    full names + the order's category + a quick handle on which worker
+    was rated. Strings everywhere so the dashboard doesn't have to do
+    secondary lookups.
+    """
+
+    client_username = serializers.CharField(source="client.username", read_only=True)
+    client_name = serializers.CharField(source="client.name_ar", read_only=True)
+    worker_username = serializers.CharField(source="worker.username", read_only=True)
+    worker_name = serializers.CharField(source="worker.name_ar", read_only=True)
+    worker_profession = serializers.SerializerMethodField()
+    order_id = serializers.IntegerField(source="order.id", read_only=True)
+    order_category = serializers.CharField(
+        source="order.service_category.name", read_only=True,
+    )
+
+    class Meta:
+        model = Rating
+        fields = [
+            "id",
+            "stars",
+            "review",
+            "created_at",
+            "order_id",
+            "order_category",
+            "client_username",
+            "client_name",
+            "worker_username",
+            "worker_name",
+            "worker_profession",
+        ]
+        read_only_fields = fields
+
+    def get_worker_profession(self, obj):
+        profile = getattr(obj.worker, "worker_profile", None)
+        return profile.profession if profile else None

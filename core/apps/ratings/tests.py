@@ -76,3 +76,60 @@ class RatingTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["stars"], 4)
+
+    def test_rating_create_fires_worker_notification(self):
+        """When a client rates a completed order, the worker gets a
+        Notification row so their mobile bell lights up within the
+        next NotificationCubit poll."""
+        from apps.notifications.models import Notification
+        order = self._completed_order()
+        self.client.force_authenticate(user=self.client_user)
+        response = self.client.post(reverse("rating-create"), {
+            "order": order.id, "stars": 5, "review": "Excellent!",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        notes = Notification.objects.filter(user=self.worker_user)
+        self.assertEqual(notes.count(), 1, "worker should get exactly one rating notification")
+        payload = notes.first().data
+        self.assertEqual(payload["kind"], "rating")
+        self.assertEqual(payload["order_id"], order.id)
+        self.assertEqual(payload["stars"], 5)
+
+    def test_admin_ratings_list_returns_enriched_shape(self):
+        """Admin dashboard reads client/worker/profession/order_category
+        — must be present on every row."""
+        from django.core.cache import cache
+        cache.clear()  # avoid AuthRateThrottle bleed
+        order = self._completed_order()
+        Rating.objects.create(
+            order=order, client=self.client_user, worker=self.worker_user,
+            stars=5, review="Great",
+        )
+        admin = User.objects.create_user(
+            username="admin_rate_view", phone="+201000000099",
+            password="AdminPass123", role=User.Role.ADMIN,
+        )
+        login = self.client.post(reverse("login"), {
+            "username": admin.username, "password": "AdminPass123",
+        }, format="json")
+        self.assertEqual(login.status_code, status.HTTP_200_OK, login.data)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {login.data["tokens"]["access"]}',
+        )
+
+        response = self.client.get(reverse("admin-rating-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        row = response.data[0]
+        for key in (
+            "id", "stars", "review", "created_at",
+            "order_id", "order_category",
+            "client_username", "client_name",
+            "worker_username", "worker_name", "worker_profession",
+        ):
+            self.assertIn(key, row, f"missing key: {key}")
+        self.assertEqual(row["order_id"], order.id)
+        self.assertEqual(row["order_category"], "Plumbing")
+        self.assertEqual(row["worker_username"], "will")
+        self.assertEqual(row["worker_profession"], "Plumbing")

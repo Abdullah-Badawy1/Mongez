@@ -12,36 +12,83 @@ const Ratings = () => {
     usePolling(fetchRatings, { intervalMs: 30_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
+  const fmtDate = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
   const columns = [
-    { key: 'id', label: 'Rating #' },
     {
       key: 'order',
       label: 'Order',
-      render: (row) => `#${row.order}`,
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 600, color: '#1e293b' }}>#{row.order_id}</div>
+          <div className="text-muted" style={{ fontSize: '12px' }}>
+            {row.order_category || '—'}
+          </div>
+        </div>
+      ),
     },
     {
-      key: 'client_name',
+      key: 'client',
       label: 'Client',
-      render: (row) => row.client_name || 'N/A',
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 500 }}>
+            {row.client_name || row.client_username || 'N/A'}
+          </div>
+          {row.client_username && row.client_name ? (
+            <div className="text-muted" style={{ fontSize: '12px' }}>@{row.client_username}</div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'worker',
+      label: 'Worker',
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 500 }}>
+            {row.worker_name || row.worker_username || 'N/A'}
+          </div>
+          {row.worker_profession ? (
+            <div className="text-muted" style={{ fontSize: '12px' }}>{row.worker_profession}</div>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: 'stars',
       label: 'Stars',
       render: (row) => (
-        <span style={{ color: '#f59e0b' }}>
+        <span style={{ color: '#f59e0b', whiteSpace: 'nowrap' }}>
           {'★'.repeat(row.stars)}{'☆'.repeat(5 - row.stars)}
+          <span className="text-muted ms-2" style={{ fontSize: '12px' }}>
+            {row.stars}/5
+          </span>
         </span>
       ),
     },
     {
       key: 'review',
       label: 'Review',
-      render: (row) => row.review || <span className="text-muted">-</span>,
+      render: (row) =>
+        row.review
+          ? <span title={row.review} style={{ display: 'inline-block', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>{row.review}</span>
+          : <span className="text-muted">—</span>,
     },
     {
       key: 'created_at',
       label: 'Date',
-      render: (row) => new Date(row.created_at).toLocaleDateString(),
+      render: (row) => (
+        <span style={{ fontSize: '13px', color: '#475569' }}>
+          {fmtDate(row.created_at)}
+        </span>
+      ),
     },
   ];
 

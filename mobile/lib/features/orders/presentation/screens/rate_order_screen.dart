@@ -1,10 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/core/constants/endpoints.dart';
+import 'package:mongez/errors/failure.dart';
+import 'package:mongez/features/orders/data/models/order_model.dart';
+import 'package:mongez/features/orders/presentation/cubit/customer_orders_cubit.dart';
+import 'package:mongez/features/workers/presentation/cubit/worker_stats_cubit.dart';
 import 'package:mongez/generated/l10n.dart';
 import 'package:mongez/services/api_service.dart';
 import 'package:mongez/services/services_locator.dart';
 import 'package:mongez/widgets/custom_app_bar.dart';
-import 'package:mongez/features/orders/data/models/order_model.dart';
 
 class RateOrderScreen extends StatefulWidget {
   final OrderModel order;
@@ -29,22 +34,44 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
   Future<void> _submit() async {
     if (_stars == 0) return;
     setState(() => _submitting = true);
+
+    // Capture refs before await — the BlocProvider may go away if the
+    // user backs out while the request is in flight.
+    final ordersCubit = context.read<CustomerOrdersCubit>();
+    final statsCubit = context.read<WorkerStatsCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final lang = S.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+
     try {
       await getIt.get<ApiService>().post(endPoint: Endpoints.ratings, body: {
         'order': widget.order.id,
         'stars': _stars,
         'review': _reviewController.text.trim(),
       });
+
+      // Refresh both surfaces so the "Rate" button disappears on the
+      // client side and the worker's stats card picks the new average
+      // up without waiting for its 30 s poll.
+      ordersCubit.getOrders();
+      statsCubit.load();
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.of(context).ratingSubmitted)),
-      );
-      Navigator.pop(context, true);
-    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(lang.ratingSubmitted)));
+      navigator.pop(true);
+    } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.of(context).errorOccurred)),
+
+      // Surface the backend's real message — "You already rated this
+      // order", "The order must be completed before rating", etc.
+      var message = lang.errorOccurred;
+      if (e is DioException) {
+        message = ServerFailure.fromDioException(e).errorMessage;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: errorColor),
       );
     }
   }
