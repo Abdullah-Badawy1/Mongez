@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/features/account/screens/account_screen.dart';
 import 'package:mongez/features/favorites/screens/favorite_screen.dart';
 import 'package:mongez/features/home/screens/home_screen.dart';
+import 'package:mongez/features/home/screens/worker_home_screen.dart';
 import 'package:mongez/features/auth/models/auth.dart';
 import 'package:mongez/features/notifications/presentation/cubit/notification_cubit.dart';
 import 'package:mongez/features/requests/screens/customer_requests_screen.dart';
@@ -48,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   late final List<Widget> _screensTechnician = [
-    HomeScreen(isCustomer: false, user: widget.auth.user!),
+    WorkerHomeScreen(user: widget.auth.user!),
     const JobHistoryScreen(),
     const RequestsScreen(),
     const AccountScreen(isCustomer: false),
