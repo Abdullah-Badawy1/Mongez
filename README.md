@@ -211,7 +211,7 @@ Authorization: Bearer <access_token>
 | Reference data | `GET governorates/` (public — 27 Egyptian governorates with code, name_en, name_ar) |
 | Categories | `GET categories/` |
 | Workers | `GET workers/` `GET workers/<id>/` `POST workers/create/` `GET/PATCH workers/me/` `GET workers/me/stats/` |
-| Orders | `GET/POST orders/` `POST orders/<id>/accept\|reject\|cancel\|complete/` |
+| Orders | `GET/POST orders/` `POST orders/<id>/accept\|reject\|cancel\|complete\|confirm-completion/` (two-step handshake: worker `complete` → `WAITING_CONFIRMATION` → client `confirm-completion` → `COMPLETED`) |
 | Notifications | `GET notifications/` `POST notifications/read-all/` |
 | Ratings | `POST ratings/` |
 | Favorites | `GET/POST favorites/` `DELETE favorites/<id>/` |

@@ -15,7 +15,7 @@ const Categories = () => {
   // 60 s — categories are basically static; we just want them to refresh
   // automatically if another admin adds one in a parallel session.
   const { data: categories, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchCategories, { intervalMs: 60_000, initialData: [] });
+    usePolling(fetchCategories, { intervalMs: 20_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const openAdd = () => {

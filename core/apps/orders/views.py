@@ -1,4 +1,6 @@
 import logging
+
+from django.db.models import Q
 from datetime import datetime, timezone
 
 from django.conf import settings
@@ -95,7 +97,12 @@ class OrderListCreateView(APIView):
         if user.role == User.Role.CLIENT:
             orders = base.filter(client=user)
         elif user.role == User.Role.WORKER:
-            orders = base.filter(worker=user)
+            # Workers see: jobs assigned to them AND any orders they
+            # placed themselves (a plumber needs an electrician at home).
+            # `__exact=user.id` keeps both filters indexable.
+            orders = base.filter(
+                Q(worker=user) | Q(client=user),
+            ).distinct()
         else:
             orders = base.all()
 
@@ -107,10 +114,14 @@ class OrderListCreateView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        # Client-only enforced via per-method permission below
-        if request.user.role != User.Role.CLIENT:
+        # Clients can always order. Workers can also place orders (e.g.
+        # a plumber needs an electrician at home) — but they're not
+        # allowed to order their OWN profession; that'd be self-dealing
+        # since they'd just dispatch themselves and collect commission
+        # on a no-op. Admins are never order-placers.
+        if request.user.role == User.Role.ADMIN:
             return Response(
-                {"error": "Only clients can create orders."},
+                {"error": "Admins can't place orders. Use a client account."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -119,6 +130,23 @@ class OrderListCreateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         vd = serializer.validated_data
+
+        # Block same-profession orders for workers.
+        if request.user.role == User.Role.WORKER:
+            profile = getattr(request.user, "worker_profile", None)
+            if profile is not None:
+                requested_cat = vd["service_category"].name
+                if (profile.profession or "").lower() == requested_cat.lower():
+                    return Response(
+                        {"service_category": [
+                            f"You can't order a {requested_cat} service — "
+                            "that's your own profession. Pick a different "
+                            "category (e.g. an electrician can hire a "
+                            "plumber, but not another electrician)."
+                        ]},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
         order = Order.objects.create(
             client=request.user,
             service_category=vd["service_category"],
@@ -358,18 +386,18 @@ class OrderRejectView(APIView):
 
 
 class OrderCancelView(APIView):
-    """POST /api/orders/{id}/cancel/ — client cancels the order"""
+    """POST /api/orders/{id}/cancel/ — the orderer cancels the order.
+
+    "Orderer" is the user stored as `Order.client`. That's a real
+    customer most of the time, but it can also be a worker who placed
+    the order through the "Need a service?" flow on the worker home.
+    """
+
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, pk):
-        if request.user.role != User.Role.CLIENT:
-            return Response(
-                {"error": "Only clients can cancel orders."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         try:
-            # Filter by client so a client can never cancel someone else's order
             order = Order.objects.get(pk=pk, client=request.user)
         except Order.DoesNotExist:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -412,43 +440,112 @@ class OrderCancelView(APIView):
 
 
 class OrderCompleteView(APIView):
-    """POST /api/orders/{id}/complete/ — worker marks the order as done"""
+    """POST /api/orders/{id}/complete/ — worker marks the job as
+    physically done.
+
+    This is the **first half** of the two-step completion handshake:
+    the worker presses "Mark as finished", we move the order from
+    ACCEPTED → WAITING_CONFIRMATION and ping the client. The order
+    isn't actually COMPLETED yet — the client has to confirm, which
+    bumps the worker's `completed_jobs` counter and triggers the
+    "leave a rating" notification.
+    """
+
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, pk):
         if request.user.role != User.Role.WORKER:
             return Response(
-                {"error": "Only workers can complete orders."},
+                {"error": "Only workers can mark orders as finished."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
-            # Filter by worker so a worker can only complete their own assigned orders
             order = Order.objects.get(pk=pk, worker=request.user)
         except Order.DoesNotExist:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if order.status != Order.ACCEPTED:
             return Response(
-                {"error": f"Cannot complete an order with status '{order.status}'."},
+                {"error": f"Cannot mark this order as finished from status '{order.status}'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Update order
-        order.status   = Order.COMPLETED
-        order.completed_at = now()
-        order.save()
+        order.status = Order.WAITING_CONFIRMATION
+        order.marked_finished_at = now()
+        order.save(update_fields=["status", "marked_finished_at"])
 
-        # Update worker's completed jobs count
-        profile = request.user.worker_profile
-        profile.completed_jobs += 1
-        profile.save()
-
-        # Notify client to leave a rating
+        # Ping the client to confirm.
         send_notification(
             order.client,
-            title      = "Job Completed ⭐",
-            message    = f"Order #{order.id} is done! Please leave a rating for the worker.",
-            notif_type = Notification.PUSH,
+            title=f"Order #{order.id} — please confirm it's done",
+            message=(
+                f"Your worker says the {order.service_category.name} job "
+                "is finished. Open the order and tap Confirm to close it "
+                "and leave a rating."
+            ),
+            notif_type=Notification.PUSH,
+        )
+        return Response(OrderSerializer(order, context={"request": request}).data)
+
+
+class OrderConfirmCompletionView(APIView):
+    """POST /api/orders/{id}/confirm-completion/ — client confirms
+    the worker's "marked finished" claim.
+
+    This is the **second half** of the two-step completion handshake.
+    Only the order's `client` field owner can call it (which is also
+    how a worker who placed an order can confirm — they're the
+    client of that order). On success we bump the worker's
+    `completed_jobs` counter and ask the client for a rating.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            # Only the orderer can confirm — that's whoever is stored
+            # as the order's `client`, regardless of role.
+            order = Order.objects.select_related("worker", "service_category").get(
+                pk=pk, client=request.user,
+            )
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.status != Order.WAITING_CONFIRMATION:
+            return Response(
+                {"error": (
+                    f"Cannot confirm completion from status '{order.status}'. "
+                    "The worker must mark the job as finished first."
+                )},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.status = Order.COMPLETED
+        order.completed_at = now()
+        order.save(update_fields=["status", "completed_at"])
+
+        # Now we can finally bump the worker's stats — done only on
+        # the *client-confirmed* completion, not on the worker's
+        # self-claim.
+        if order.worker is not None:
+            profile = getattr(order.worker, "worker_profile", None)
+            if profile is not None:
+                profile.completed_jobs = (profile.completed_jobs or 0) + 1
+                profile.save(update_fields=["completed_jobs"])
+
+            # Ask the worker to celebrate, prompt the client to rate.
+            send_notification(
+                order.worker,
+                title=f"Order #{order.id} closed ✅",
+                message=f"The client confirmed the {order.service_category.name} job is done.",
+                notif_type=Notification.PUSH,
+            )
+        send_notification(
+            request.user,
+            title="Job confirmed — leave a rating?",
+            message=f"Order #{order.id} is closed. Tap to leave a star rating for the worker.",
+            notif_type=Notification.PUSH,
         )
         return Response(OrderSerializer(order, context={"request": request}).data)

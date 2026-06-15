@@ -295,7 +295,8 @@ Views (all under `IsAuthenticated`, with role checks inside):
 | `POST /api/orders/<id>/accept/` | Worker accepts → captures commission, sets commission amount, notifies client |
 | `POST /api/orders/<id>/reject/` | Worker rejects → voids commission, notifies client |
 | `POST /api/orders/<id>/cancel/` | Client cancels (only while PENDING) → voids commission, notifies worker |
-| `POST /api/orders/<id>/complete/` | Worker marks done → increments `completed_jobs`, asks client to rate |
+| `POST /api/orders/<id>/complete/` | Worker marks finished → moves to `WAITING_CONFIRMATION`, pings client |
+| `POST /api/orders/<id>/confirm-completion/` | Client confirms done → `COMPLETED`, bumps `completed_jobs`, prompts to rate |
 
 Important rules (enforced in views):
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/features/account/screens/add_service_screen.dart';
 import 'package:mongez/features/auth/models/user.dart';
+import 'package:mongez/features/categories/screens/categories_screen.dart';
 import 'package:mongez/features/orders/data/models/order_model.dart';
 import 'package:mongez/features/orders/presentation/cubit/technician_orders_cubit.dart';
 import 'package:mongez/features/orders/presentation/screens/order_details_screen.dart';
@@ -67,9 +68,22 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      // Workers can hire other workers — e.g. a plumber who needs an
+      // electrician at home. The backend blocks ordering your own
+      // profession; for any other category this just works.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CategoriesScreen(isCustomer: true),
+          ),
+        ),
+        icon: const Icon(Icons.add_shopping_cart_rounded),
+        label: const Text('Need a service?'),
+      ),
       // Re-fetch stats whenever the orders cubit emits — covers Accept,
-      // Reject, Mark-finished. Counters then refresh without waiting
-      // for the 30 s WorkerStatsCubit poll.
+      // Reject, Mark-finished. Counters refresh without waiting for the
+      // WorkerStatsCubit's own poll.
       body: BlocListener<TechnicianOrdersCubit, TechnicianOrdersState>(
         listener: (_, __) => _statsCubit?.load(),
         child: SafeArea(

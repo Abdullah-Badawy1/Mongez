@@ -57,7 +57,7 @@ const Users = () => {
   // 30 s — admins rarely watch the user list move; refresh is cheap when
   // filter or page changes, otherwise let the user reach for the button.
   const { data, loading, lastUpdatedAt, refresh } = usePolling(fetchUsers, {
-    intervalMs: 30_000,
+    intervalMs: 10_000,
     initialData: { results: [], count: 0 },
   });
   const allUsers = data?.results || [];

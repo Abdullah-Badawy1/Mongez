@@ -3,14 +3,17 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from core.permissions import IsClient
 from core.throttling import RatingThrottle
 from .models import Rating
 from .serializers import RatingSerializer, WorkerRatingSerializer
 
 
 class RatingCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsClient]
+    # Any authenticated orderer can rate an order they placed — the
+    # serializer's "you can only rate your own orders" check is what
+    # actually gates this, not the role. A worker who hired another
+    # worker can therefore rate the worker who served them.
+    permission_classes = [IsAuthenticated]
     throttle_classes = [RatingThrottle]
 
     def post(self, request):

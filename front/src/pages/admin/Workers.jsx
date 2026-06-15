@@ -18,7 +18,7 @@ const Workers = () => {
 
   // 30 s — worker profiles change slowly (rating updates, availability).
   const { data, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchWorkers, { intervalMs: 30_000, initialData: { results: [], count: 0, complete_count: 0, incomplete_count: 0 } });
+    usePolling(fetchWorkers, { intervalMs: 10_000, initialData: { results: [], count: 0, complete_count: 0, incomplete_count: 0 } });
   const workers = data?.results || [];
   const total = data?.count || 0;
   const completeCount = data?.complete_count || 0;

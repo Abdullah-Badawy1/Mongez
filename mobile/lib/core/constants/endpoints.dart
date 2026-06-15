@@ -40,11 +40,14 @@ class Endpoints {
   static String orderAccept(int id) => 'orders/$id/accept/';
   static String orderReject(int id) => 'orders/$id/reject/';
   static String orderCancel(int id) => 'orders/$id/cancel/';
-  // Backend only supports a single-step completion: the assigned worker
-  // calls /complete/. Mobile's "mark finished" and "confirm completion"
-  // both map to that — customer calls will return 403, handled at the UI.
+  // Two-step completion. The assigned worker calls /complete/ to set
+  // the order to WAITING_CONFIRMATION, then the orderer (Order.client —
+  // usually a customer, sometimes a worker who hired another worker)
+  // calls /confirm-completion/ to flip it to COMPLETED.
+  // The `worker_profile.completed_jobs` counter only bumps on confirm.
   static String orderMarkFinished(int id) => 'orders/$id/complete/';
-  static String orderConfirmCompletion(int id) => 'orders/$id/complete/';
+  static String orderConfirmCompletion(int id) =>
+      'orders/$id/confirm-completion/';
 
   // ── Favorites ──
   static const String favorites = 'favorites/';

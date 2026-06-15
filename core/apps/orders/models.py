@@ -6,6 +6,11 @@ from apps.workers.models import ServiceCategory
 class Order(models.Model):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
+    # Worker pressed "Mark as finished" but the client hasn't signed off
+    # yet. Two-step completion: the order doesn't actually finish (no
+    # completion timestamp, no completed_jobs bump) until the client
+    # explicitly confirms.
+    WAITING_CONFIRMATION = "WAITING_CONFIRMATION"
     REJECTED = "REJECTED"
     CANCELLED = "CANCELLED"
     COMPLETED = "COMPLETED"
@@ -13,6 +18,7 @@ class Order(models.Model):
     STATUS_CHOICES = [
         (PENDING, "Pending"),
         (ACCEPTED, "Accepted"),
+        (WAITING_CONFIRMATION, "Waiting for client confirmation"),
         (REJECTED, "Rejected"),
         (CANCELLED, "Cancelled"),
         (COMPLETED, "Completed"),
@@ -64,13 +70,16 @@ class Order(models.Model):
 
     commission = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(
-        max_length = 10,
+        max_length = 20,
         choices = STATUS_CHOICES,
         default = PENDING,
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     accepted_at  = models.DateTimeField(null=True, blank=True)
+    # Worker pressed "Mark as finished" — the job is physically done but
+    # we wait for the client's confirmation before flipping to COMPLETED.
+    marked_finished_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
 

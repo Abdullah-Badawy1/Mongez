@@ -29,7 +29,7 @@ const Dashboard = () => {
   // Live-poll the dashboard aggregate every 10 s so admins see mobile
   // activity (new orders, status changes) without manual refresh.
   const { data, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchDashboard, { intervalMs: 10_000 });
+    usePolling(fetchDashboard, { intervalMs: 3_000 });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const stats = data?.stats || null;

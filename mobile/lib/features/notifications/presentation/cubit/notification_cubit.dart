@@ -23,7 +23,7 @@ class NotificationCubit extends Cubit<NotificationState> {
 
   void startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _fetch());
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetch());
     _fetch();
   }
 

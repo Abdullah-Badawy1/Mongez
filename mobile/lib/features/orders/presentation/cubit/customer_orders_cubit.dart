@@ -35,7 +35,7 @@ class CustomerOrdersCubit extends Cubit<CustomerOrdersState> {
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 10),
       (_) => _loadOrders(),
     );
     _loadOrders();

@@ -48,19 +48,55 @@ class OrderLifecycleTests(APITestCase):
         self.assertEqual(accept_resp.status_code, status.HTTP_200_OK, accept_resp.data)
         self.assertEqual(accept_resp.data["status"], Order.ACCEPTED)
 
-    def test_worker_can_complete_order_and_increment_jobs(self):
+    def test_two_step_completion_requires_client_confirmation(self):
         create_resp = self._create_order()
         order_id = create_resp.data["id"]
 
+        # Worker accepts then marks finished — should land in WAITING_CONFIRMATION,
+        # NOT bump completed_jobs yet.
         self.client.force_authenticate(user=self.worker_user)
         with patch("apps.orders.views.paymob.capture_commission", return_value={}):
             self.client.post(reverse("order-accept", args=[order_id]))
-        complete_resp = self.client.post(reverse("order-complete", args=[order_id]))
-        self.assertEqual(complete_resp.status_code, status.HTTP_200_OK, complete_resp.data)
-        self.assertEqual(complete_resp.data["status"], Order.COMPLETED)
+        mark_resp = self.client.post(reverse("order-complete", args=[order_id]))
+        self.assertEqual(mark_resp.status_code, status.HTTP_200_OK, mark_resp.data)
+        self.assertEqual(mark_resp.data["status"], Order.WAITING_CONFIRMATION)
+        self.worker_user.worker_profile.refresh_from_db()
+        self.assertEqual(self.worker_user.worker_profile.completed_jobs, 0)
 
+        # Client confirms — order closes, counter bumps.
+        self.client.force_authenticate(user=self.client_user)
+        confirm_resp = self.client.post(reverse("order-confirm-completion", args=[order_id]))
+        self.assertEqual(confirm_resp.status_code, status.HTTP_200_OK, confirm_resp.data)
+        self.assertEqual(confirm_resp.data["status"], Order.COMPLETED)
         self.worker_user.worker_profile.refresh_from_db()
         self.assertEqual(self.worker_user.worker_profile.completed_jobs, 1)
+
+    def test_worker_cannot_order_in_own_profession(self):
+        self.client.force_authenticate(user=self.worker_user)
+        with patch("apps.orders.views.authorize_commission", return_value="dummy_key"):
+            resp = self.client.post(reverse("order-list-create"), {
+                "service_category": self.category.id,
+            }, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("service_category", resp.data)
+
+    def test_worker_can_order_other_category(self):
+        other = ServiceCategory.objects.create(name="Electrical")
+        electrician = User.objects.create_user(
+            username="ed", phone="+201000000012", password="Sup3r-Secret!",
+            role=User.Role.WORKER,
+        )
+        WorkerProfile.objects.create(
+            user=electrician, profession="Electrical", experience_years=2,
+        )
+        self.client.force_authenticate(user=self.worker_user)
+        with patch("apps.orders.views.authorize_commission", return_value="dummy_key"):
+            resp = self.client.post(reverse("order-list-create"), {
+                "service_category": other.id,
+                "worker_id": electrician.id,
+            }, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data["status"], Order.PENDING)
 
     def test_client_cannot_accept_order(self):
         create_resp = self._create_order()

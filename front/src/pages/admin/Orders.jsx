@@ -31,7 +31,7 @@ const Orders = () => {
   // 10 s — Orders is the most dynamic admin surface; we want a new mobile
   // order or an accept-from-worker to land in the UI within ten seconds.
   const { data: orders, loading, lastUpdatedAt, refresh, setData } =
-    usePolling(fetchOrders, { intervalMs: 10_000, initialData: [] });
+    usePolling(fetchOrders, { intervalMs: 3_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const handleStatusChange = useCallback(async (orderId, newStatus) => {

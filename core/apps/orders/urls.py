@@ -9,4 +9,5 @@ urlpatterns = [
     path("orders/<int:pk>/reject/", views.OrderRejectView.as_view(), name="order-reject"),
     path("orders/<int:pk>/cancel/", views.OrderCancelView.as_view(), name="order-cancel"),
     path("orders/<int:pk>/complete/", views.OrderCompleteView.as_view(), name="order-complete"),
+    path("orders/<int:pk>/confirm-completion/", views.OrderConfirmCompletionView.as_view(), name="order-confirm-completion"),
 ]

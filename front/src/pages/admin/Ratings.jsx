@@ -9,7 +9,7 @@ const Ratings = () => {
   // 30 s — ratings only land at order-complete time, so we don't need a
   // tight loop here.
   const { data: ratings, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchRatings, { intervalMs: 30_000, initialData: [] });
+    usePolling(fetchRatings, { intervalMs: 10_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const fmtDate = (iso) => {

@@ -168,7 +168,8 @@ or
 | POST | `/api/orders/<id>/accept/` | Yes, worker | Accept pending order |
 | POST | `/api/orders/<id>/reject/` | Yes, worker | Reject pending order |
 | POST | `/api/orders/<id>/cancel/` | Yes, client | Cancel pending order |
-| POST | `/api/orders/<id>/complete/` | Yes, worker | Mark accepted order complete |
+| POST | `/api/orders/<id>/complete/` | Yes, worker | Worker marks job finished → moves to `WAITING_CONFIRMATION` |
+| POST | `/api/orders/<id>/confirm-completion/` | Yes, client | Client confirms job done → `COMPLETED`, bumps worker `completed_jobs` |
 
 Create order body:
 
