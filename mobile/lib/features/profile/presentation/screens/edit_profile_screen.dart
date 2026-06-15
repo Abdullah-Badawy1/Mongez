@@ -45,6 +45,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // touch `context` (back-pop crash defense).
   ProfileCubit? _profileCubit;
 
+  // The BlocConsumer.listener fires on every state change. Without
+  // these flags, a silent ProfileCubit re-emit (e.g. from
+  // NavigationService._fetchFreshData) would pop the screen
+  // unexpectedly while the user was still editing — which previously
+  // looked like a freeze when pressing back.
+  bool _saving = false;
+  bool _popped = false;
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +102,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final cubit = _profileCubit;
     if (cubit == null) return;
+    setState(() => _saving = true);
     cubit.updateProfile(
       nameAr: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
@@ -111,18 +120,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final tt = theme.textTheme;
 
     return BlocConsumer<ProfileCubit, ProfileState>(
+      // Only react when the change came from OUR Save click. Other
+      // parts of the app silently refresh the profile (e.g.
+      // NavigationService._fetchFreshData) and we don't want a
+      // background ProfileSuccess to pop the screen while the user
+      // is mid-edit — that previously looked like a back-button
+      // freeze because the screen popped itself out from under the
+      // user.
+      listenWhen: (previous, current) => _saving,
       listener: (ctx, state) {
-        if (state is ProfileSuccess) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(ctx).showSnackBar(
+        if (state is ProfileSuccess && !_popped && mounted) {
+          _popped = true;
+          // Pop first; show the snack via the *parent* messenger so
+          // it isn't tied to this Scaffold's disposed state.
+          final messenger = ScaffoldMessenger.maybeOf(ctx);
+          Navigator.of(ctx).maybePop();
+          messenger?.showSnackBar(
             const SnackBar(
               content: Text('Profile updated'),
               behavior: SnackBarBehavior.floating,
             ),
           );
-          Navigator.of(ctx).pop();
         } else if (state is ProfileFailure) {
           if (!mounted) return;
+          setState(() => _saving = false);
           ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(
               content: Text(state.errorMessage),
@@ -133,7 +154,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       },
       builder: (ctx, state) {
-        final loading = state is ProfileLoading;
+        // Only show the spinner when this screen kicked off the work.
+        final loading = _saving && state is ProfileLoading;
         return Scaffold(
           appBar: const CustomAppBar(title: 'Edit profile'),
           body: AbsorbPointer(

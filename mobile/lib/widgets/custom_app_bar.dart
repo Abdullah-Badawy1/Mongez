@@ -38,7 +38,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 shape: const CircleBorder(),
                 child: InkWell(
                   customBorder: const CircleBorder(),
-                  onTap: () => Navigator.pop(context),
+                  // maybePop is the safe variant: if a rebuild swallowed
+                  // the topmost route mid-tap (this used to freeze the
+                  // app when coming back from Edit profile / Settings)
+                  // we just no-op instead of throwing.
+                  onTap: () => Navigator.maybePop(context),
                   child: Icon(
                     isRtl
                         ? Icons.arrow_forward_rounded
@@ -61,10 +65,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         if (showNotification)
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 14),
+            // One subscription: BlocBuilder rebuilds on every cubit
+            // change, then we read the helper getter for unread count.
+            // (Previously the inner `context.watch` doubled the
+            // subscription which triggered two rebuilds per poll.)
             child: BlocBuilder<NotificationCubit, NotificationState>(
-              builder: (context, state) {
+              builder: (context, _) {
                 final unread =
-                    context.watch<NotificationCubit>().unreadCount;
+                    context.read<NotificationCubit>().unreadCount;
                 return Material(
                   color: cs.surfaceContainerHighest,
                   shape: const CircleBorder(),
