@@ -853,6 +853,9 @@ Profile
   GET   /api/users/me/                              auth
   PATCH /api/users/me/                              auth (multipart for avatar)
 
+Reference data
+  GET   /api/governorates/                          public (27 Egyptian governorates: code/name_en/name_ar)
+
 Categories
   GET   /api/categories/                            public
   POST  /api/categories/create/                     admin
@@ -861,9 +864,10 @@ Workers
   GET   /api/workers/                               public  (category, search, min_rating, available, ordering, page, page_size)
   GET   /api/workers/<id>/                          public
   GET   /api/workers/<id>/stats/                    public
-  POST  /api/workers/create/                        worker
+  POST  /api/workers/create/                        worker  (accepts category_id+description OR profession+bio)
   GET   /api/workers/me/                            worker
   PATCH /api/workers/me/                            worker
+  GET   /api/workers/me/stats/                      worker  (lifetime + this-month + recent ratings)
 
 Orders
   GET   /api/orders/                                auth (status filter)
@@ -897,19 +901,20 @@ Favorites
   DELETE/api/favorites/worker/<worker_id>/          client
 
 Admin (used by the React dashboard — admin role only)
-  GET    /api/admin/dashboard/                      admin
-  GET    /api/admin/users/?search=&role=&page=&page_size=    admin
-  POST   /api/admin/users/create/                   admin
-  GET    /api/admin/users/<id>/                     admin
-  PATCH  /api/admin/users/<id>/                     admin
-  DELETE /api/admin/users/<id>/                     admin
-  PATCH  /api/admin/categories/<id>/                admin
-  DELETE /api/admin/categories/<id>/                admin
-  GET    /api/admin/payments/                       admin
-  PATCH  /api/admin/orders/<id>/status/             admin
-  GET    /api/admin/workers/?search=&page=&page_size= admin
-  GET    /api/admin/workers/<id>/                   admin
-  GET    /api/admin/ratings/                        admin
+  GET    /api/admin/dashboard/                                  admin   (5 s cache on aggregate)
+  GET    /api/admin/users/?search=&role=&page=&page_size=       admin
+  POST   /api/admin/users/create/                               admin
+  GET    /api/admin/users/<id>/                                 admin
+  PATCH  /api/admin/users/<id>/                                 admin
+  DELETE /api/admin/users/<id>/                                 admin
+  PATCH  /api/admin/categories/<id>/                            admin
+  DELETE /api/admin/categories/<id>/                            admin
+  GET    /api/admin/payments/                                   admin
+  PATCH  /api/admin/orders/<id>/status/                         admin   (fans out → client + worker notifications)
+  GET    /api/admin/workers/?search=&page=&status=complete|incomplete  admin
+                                                                       (response includes complete_count + incomplete_count)
+  GET    /api/admin/workers/<id>/                               admin
+  GET    /api/admin/ratings/                                    admin   (enriched: client_name, worker_name, worker_profession, order_category)
 
 Misc
   GET   /api/health/                                public (used by HEALTHCHECK)

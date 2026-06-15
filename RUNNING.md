@@ -364,7 +364,7 @@ docker compose exec web python manage.py shell
 ### Run tests (matches CI)
 
 ```bash
-docker compose exec -T web python manage.py test apps        # backend (39 tests)
+docker compose exec -T web python manage.py test apps        # backend (48 tests)
 ( cd front  && npm run lint && npm run build )                # dashboard
 ( cd mobile && flutter analyze && flutter test )              # mobile
 ```

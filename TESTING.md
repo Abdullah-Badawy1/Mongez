@@ -103,7 +103,7 @@ docker compose exec -T web python manage.py test apps --noinput
 **Expected (current count):**
 
 ```
-Ran 39 tests in ~5s
+Ran 48 tests in ~5s
 OK
 ```
 

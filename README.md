@@ -60,6 +60,24 @@ Mongez/
 
 ---
 
+## Reading order — how to ramp up
+
+The docs are layered so you can stop at any depth. Pick the path that
+matches your goal:
+
+| If you want to… | Read in this order |
+|---|---|
+| **Get it running locally in 30 s** | [`RUNNING.md`](RUNNING.md) (§1) → done. |
+| **Understand the whole platform** | this README → [`RUNNING.md`](RUNNING.md) → [`all.md`](all.md) (deep dive, ~900 lines, every app + cubit) → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (PlantUML diagrams). |
+| **Add a feature** | this README → [`all.md`](all.md) §4 (backend apps) and §5–6 (mobile + dashboard) → [`CONTRIBUTING.md`](CONTRIBUTING.md). |
+| **Review a PR** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the mental model → [`TESTING.md`](TESTING.md) for what to expect when you run the suite → [`PROFESSIONAL.md`](PROFESSIONAL.md) for the engineering bar. |
+| **Verify everything works end-to-end** | [`TESTING.md`](TESTING.md) — copy-paste runnable. |
+| **Port it to Windows** | [`WINDOWS.md`](WINDOWS.md). |
+| **Plan production deployment** | [`PROFESSIONAL.md`](PROFESSIONAL.md) — what's already pro and what to add next, ordered by impact ÷ effort. |
+| **Hit a specific endpoint** | [`API_links.md`](API_links.md) — request/response shapes for every URL. |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -190,13 +208,14 @@ Authorization: Bearer <access_token>
 |---|---|
 | Auth | `POST auth/register/` `POST auth/login/` `POST auth/token/refresh/` |
 | Profile | `GET/PATCH users/me/` |
+| Reference data | `GET governorates/` (public — 27 Egyptian governorates with code, name_en, name_ar) |
 | Categories | `GET categories/` |
-| Workers | `GET workers/` `GET workers/<id>/` `POST workers/create/` `GET/PATCH workers/me/` |
+| Workers | `GET workers/` `GET workers/<id>/` `POST workers/create/` `GET/PATCH workers/me/` `GET workers/me/stats/` |
 | Orders | `GET/POST orders/` `POST orders/<id>/accept\|reject\|cancel\|complete/` |
 | Notifications | `GET notifications/` `POST notifications/read-all/` |
 | Ratings | `POST ratings/` |
 | Favorites | `GET/POST favorites/` `DELETE favorites/<id>/` |
-| Admin (dashboard) | `GET admin/dashboard/` `GET/POST admin/users/` `GET/PATCH/DELETE admin/users/<id>/` `GET admin/workers/` `GET admin/workers/<id>/` `PATCH/DELETE admin/categories/<id>/` `PATCH admin/orders/<id>/status/` `GET admin/payments/` `GET admin/ratings/` |
+| Admin (dashboard) | `GET admin/dashboard/` (5 s cache) · `GET/POST admin/users/` `GET/PATCH/DELETE admin/users/<id>/` · `GET admin/workers/?status=complete\|incomplete` (returns `complete_count` + `incomplete_count`) `GET admin/workers/<id>/` · `PATCH/DELETE admin/categories/<id>/` · `PATCH admin/orders/<id>/status/` (fans out to client + worker notifications) · `GET admin/payments/` · `GET admin/ratings/` (enriched with client / worker / profession) |
 
 Full request/response details: see [`API_links.md`](API_links.md).
 
