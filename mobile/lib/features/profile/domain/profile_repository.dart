@@ -7,7 +7,11 @@ abstract class ProfileRepository {
   Future<Either<Failure, ProfileModel>> getProfile();
   Future<Either<Failure, ProfileModel>> updateProfile({
     String? username,
+    String? nameAr,
+    String? email,
     String? phone,
+    String? governorate,
+    String? city,
     String? address,
     Uint8List? profileImageBytes,
   });

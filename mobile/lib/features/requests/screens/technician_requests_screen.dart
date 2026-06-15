@@ -14,17 +14,23 @@ class RequestsScreen extends StatefulWidget {
 }
 
 class _RequestsScreenState extends State<RequestsScreen> {
+  // Cached so dispose() never reads from `context` — a logout flow can
+  // tear down the BlocProvider on the same frame the route is popped.
+  TechnicianOrdersCubit? _cubit;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cubit ??= context.read<TechnicianOrdersCubit>();
     // Start a 30 s background poll so a freshly placed client order or
     // a dashboard-driven status change lands here without manual refresh.
-    context.read<TechnicianOrdersCubit>().startPolling();
+    _cubit!.startPolling();
   }
 
   @override
   void dispose() {
-    context.read<TechnicianOrdersCubit>().stopPolling();
+    _cubit?.stopPolling();
+    _cubit = null;
     super.dispose();
   }
 

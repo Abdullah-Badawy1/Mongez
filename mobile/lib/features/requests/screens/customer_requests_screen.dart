@@ -14,17 +14,23 @@ class RequistesScreen extends StatefulWidget {
 }
 
 class _RequistesScreenState extends State<RequistesScreen> {
+  // Cached cubit reference so dispose() doesn't have to touch `context`
+  // (which can be torn down in a logout/back-pop race and used to crash).
+  CustomerOrdersCubit? _cubit;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cubit ??= context.read<CustomerOrdersCubit>();
     // Start a 30 s background poll so a dashboard or worker status flip
     // shows up here without a manual pull-to-refresh.
-    context.read<CustomerOrdersCubit>().startPolling();
+    _cubit!.startPolling();
   }
 
   @override
   void dispose() {
-    context.read<CustomerOrdersCubit>().stopPolling();
+    _cubit?.stopPolling();
+    _cubit = null;
     super.dispose();
   }
 

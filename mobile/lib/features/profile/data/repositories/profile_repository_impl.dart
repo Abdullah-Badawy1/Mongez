@@ -28,14 +28,22 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<Either<Failure, ProfileModel>> updateProfile({
     String? username,
+    String? nameAr,
+    String? email,
     String? phone,
+    String? governorate,
+    String? city,
     String? address,
     Uint8List? profileImageBytes,
   }) async {
     try {
       final body = <String, dynamic>{};
       if (username != null) body['username'] = username;
+      if (nameAr != null) body['name_ar'] = nameAr;
+      if (email != null) body['email'] = email;
       if (phone != null) body['phone'] = phone;
+      if (governorate != null) body['governorate'] = governorate;
+      if (city != null) body['city'] = city;
       if (address != null) body['address'] = address;
 
       late Map<String, dynamic> data;

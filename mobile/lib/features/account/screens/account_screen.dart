@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/features/checkout/screens/addresses_screen.dart';
 import 'package:mongez/features/checkout/screens/cards_screen.dart';
 import 'package:mongez/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:mongez/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:mongez/features/settings/screens/settings_screen.dart';
 import 'package:mongez/generated/l10n.dart';
 import 'package:mongez/services/navigation_service.dart';
@@ -30,11 +31,29 @@ class AccountScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _ProfileCard(
-                username: profile?.username ?? '...',
-                phone: profile?.phone ?? '',
-                address: profile?.address ?? '',
-                imageUrl: profile?.profileImage,
+              GestureDetector(
+                onTap: profile == null
+                    ? null
+                    : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditProfileScreen(profile: profile),
+                          ),
+                        ),
+                child: _ProfileCard(
+                  username:
+                      profile?.displayName ?? profile?.username ?? '...',
+                  phone: profile?.phone ?? '',
+                  address: [
+                    if ((profile?.governorateLabel ?? '').isNotEmpty)
+                      profile!.governorateLabel!,
+                    if ((profile?.city ?? '').isNotEmpty) profile!.city!,
+                    if ((profile?.address ?? '').isNotEmpty)
+                      profile!.address,
+                  ].join(' · '),
+                  imageUrl: profile?.profileImage,
+                ),
               ),
               const SizedBox(height: 20),
               if (!isCustomer) ...[

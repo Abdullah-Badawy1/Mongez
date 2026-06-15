@@ -4,6 +4,7 @@ import 'package:mongez/features/account/screens/add_service_screen.dart';
 import 'package:mongez/features/auth/bloc/register_cubit/register_cubit.dart';
 import 'package:mongez/features/auth/models/governorate.dart';
 import 'package:mongez/features/auth/repos/governorates_repo.dart';
+import 'package:mongez/features/home/bloc/categories_cubit/categories_cubit.dart';
 import 'package:mongez/generated/l10n.dart';
 import 'package:mongez/services/navigation_service.dart';
 import 'package:mongez/services/services_locator.dart';
@@ -47,6 +48,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _governoratesFuture = _loadGovernorates();
+    // Pre-warm the categories list. By the time a freshly-registered
+    // worker hits AddServiceScreen the categories are already cached
+    // in the repo and the dropdown shows up instantly.
+    // didChangeDependencies is the right place to touch context, but
+    // we just need to schedule the fetch — the cubit will absorb the
+    // call safely even if it runs twice.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CategoriesCubit>().fetchCategories();
+    });
   }
 
   Future<List<Governorate>> _loadGovernorates() async {
@@ -225,9 +236,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         if (snap.hasError) {
                           return InkWell(
-                            onTap: () => setState(() {
-                              _governoratesFuture = _loadGovernorates();
-                            }),
+                            onTap: () {
+                              if (!mounted) return;
+                              setState(() {
+                                _governoratesFuture = _loadGovernorates();
+                              });
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               decoration: BoxDecoration(

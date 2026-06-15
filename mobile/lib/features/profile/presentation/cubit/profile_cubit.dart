@@ -25,14 +25,22 @@ class ProfileCubit extends Cubit<ProfileState> {
 
   Future<void> updateProfile({
     String? username,
+    String? nameAr,
+    String? email,
     String? phone,
+    String? governorate,
+    String? city,
     String? address,
     Uint8List? profileImageBytes,
   }) async {
     emit(ProfileLoading());
     final result = await profileRepository.updateProfile(
       username: username,
+      nameAr: nameAr,
+      email: email,
       phone: phone,
+      governorate: governorate,
+      city: city,
       address: address,
       profileImageBytes: profileImageBytes,
     );

@@ -24,6 +24,21 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   bool _isAvailable = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Defensive: if the CategoriesCubit was reset or never finished
+    // its first fetch, kick it now. The repo caches for 5 minutes so
+    // this is essentially free when the list is already loaded.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final cubit = context.read<CategoriesCubit>();
+      if (cubit.state is! CategoriesSuccess) {
+        cubit.fetchCategories();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _experienceController.dispose();
     _descriptionController.dispose();
