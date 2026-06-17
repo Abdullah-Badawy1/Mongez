@@ -56,7 +56,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
           endPoint: Endpoints.userMe,
           fields: body,
           file: file,
-          fileField: 'profile_image',
+          fileField: 'avatar',
         );
       } else {
         data = await apiService.patch(endPoint: Endpoints.userMe, body: body);

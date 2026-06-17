@@ -38,7 +38,11 @@ class CategoryListView(APIView):
 
     def get(self, request):
         categories = ServiceCategory.objects.all()
-        return Response(ServiceCategorySerializer(categories, many=True).data)
+        return Response(
+            ServiceCategorySerializer(
+                categories, many=True, context={"request": request}
+            ).data
+        )
 
 
 class CategoryCreateView(APIView):
@@ -46,7 +50,9 @@ class CategoryCreateView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request):
-        serializer = ServiceCategorySerializer(data=request.data)
+        serializer = ServiceCategorySerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -6,6 +6,7 @@ class ServiceCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     name_ar = models.CharField(max_length=100, blank=True, help_text="Arabic name (الاسم بالعربية)")
     icon = models.CharField(max_length=64, blank=True, help_text="Optional icon name/key for the mobile app")
+    image = models.ImageField(upload_to="categories/", blank=True, null=True)
     description = models.CharField(max_length=255, blank=True)
     description_ar = models.CharField(max_length=255, blank=True)
 

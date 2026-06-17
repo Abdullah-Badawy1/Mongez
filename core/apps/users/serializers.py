@@ -77,8 +77,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "username", "name_ar", "email", "phone", "address",
-            "governorate", "city", "password", "role",
+            "governorate", "city", "password", "role", "avatar",
         ]
+        extra_kwargs = {
+            "avatar": {"required": False, "allow_null": True},
+        }
 
     def validate_role(self, value):
         if value == User.Role.ADMIN:
@@ -103,7 +106,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        return User.objects.create_user(
+        avatar = validated_data.pop("avatar", None)
+        user = User.objects.create_user(
             username=validated_data["username"],
             name_ar=validated_data.get("name_ar", ""),
             email=validated_data.get("email", ""),
@@ -114,6 +118,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data["password"],
             role=validated_data.get("role", User.Role.CLIENT),
         )
+        if avatar is not None:
+            user.avatar = avatar
+            user.save(update_fields=["avatar"])
+        return user
 
 
 class LoginSerializer(serializers.Serializer):

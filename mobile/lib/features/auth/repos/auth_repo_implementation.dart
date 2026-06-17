@@ -80,7 +80,7 @@ class AuthRepoImplementation implements AuthRepo {
           endPoint: Endpoints.register,
           fields: body,
           file: file,
-          fileField: "profile_image",
+          fileField: "avatar",
         );
       } else {
         data = await apiService.post(

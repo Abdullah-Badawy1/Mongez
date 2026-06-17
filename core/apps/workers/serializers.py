@@ -4,9 +4,24 @@ from .models import ServiceCategory, WorkerProfile
 
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = ServiceCategory
-        fields = ["id", "name", "name_ar", "icon", "description", "description_ar"]
+        fields = [
+            "id", "name", "name_ar", "icon", "image",
+            "description", "description_ar",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.image:
+            request = self.context.get("request") if hasattr(self, "context") else None
+            url = instance.image.url
+            data["image"] = request.build_absolute_uri(url) if request else url
+        else:
+            data["image"] = None
+        return data
 
 
 class WorkerProfileSerializer(serializers.ModelSerializer):
