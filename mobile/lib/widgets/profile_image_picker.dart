@@ -29,8 +29,12 @@ class _ProfileImagePickerState extends State<ProfileImagePicker> {
         fromCamera: source == ImageSource.camera,
       );
       if (picked != null) {
-        // Wrap in an XFile so callers (which already accept XFile) keep working.
-        widget.onImagePicked(XFile(picked.path, name: picked.name));
+        // Wrap in an in-memory XFile so callers (which already accept
+        // XFile) keep working. `picked.path` is null on web, so we build
+        // the XFile from bytes — the same shape works on native too.
+        widget.onImagePicked(
+          XFile.fromData(picked.bytes, name: picked.name),
+        );
       }
     } on MissingPluginException catch (_) {
       _toast(context, 'Image picking is not supported on this platform');

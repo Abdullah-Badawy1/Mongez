@@ -16,11 +16,14 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+// No global Content-Type. Axios infers the right header from the body:
+// `application/json` for plain objects, `multipart/form-data; boundary=…`
+// for FormData. Setting a default here poisons multipart uploads — the
+// boundary is never appended, the backend can't parse the body, and
+// `request.FILES` comes back empty. This was the reason dashboard
+// avatar uploads silently failed.
 const api = axios.create({
   baseURL: API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 api.interceptors.request.use((config) => {

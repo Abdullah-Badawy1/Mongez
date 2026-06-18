@@ -76,7 +76,8 @@ class MyApp extends StatelessWidget {
             BlocProvider(
               create: (context) =>
                   ProfileCubit(profileRepository: getIt.get<ProfileRepository>())
-                    ..getProfile(),
+                    ..getProfile()
+                    ..startPolling(),
             ),
             BlocProvider(
               create: (context) => CustomerOrdersCubit(
