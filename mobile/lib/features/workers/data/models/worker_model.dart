@@ -1,4 +1,18 @@
 import 'package:equatable/equatable.dart';
+import 'package:mongez/core/constants/api_constants.dart';
+
+/// Promote `/media/...` paths to absolute URLs so Image.network can
+/// fetch them even when the backend serializer was instantiated without
+/// `request` context (older endpoints) and returned a relative path.
+String? _absoluteMediaUrl(String? raw) {
+  if (raw == null || raw.isEmpty) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  final base = ApiConstants.baseUrl;
+  final hostEnd = base.endsWith('/api/') ? base.length - 'api/'.length : base.length;
+  final host = base.substring(0, hostEnd).replaceAll(RegExp(r'/+$'), '');
+  final path = raw.startsWith('/') ? raw : '/$raw';
+  return '$host$path';
+}
 
 class WorkerModel extends Equatable {
   final int id;
@@ -105,7 +119,9 @@ class WorkerModel extends Equatable {
       governorate: user?['governorate'] as String?,
       governorateLabel: user?['governorate_label'] as String?,
       city: user?['city'] as String?,
-      profileImage: (user?['avatar_url'] ?? user?['profile_image']) as String?,
+      profileImage: _absoluteMediaUrl(
+        (user?['avatar_url'] ?? user?['profile_image']) as String?,
+      ),
       role: user?['role'] as String?,
       // Prefer the flat `service_category_id` (always populated) over the
       // nested object — old screens passed worker.categoryId to /api/orders/

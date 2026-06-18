@@ -159,7 +159,11 @@ class OrderListCreateView(APIView):
             scheduled_for=vd.get("scheduled_for"),
         )
 
-        # Optional multipart attachments — sent under keys: attachments, photo, audio.
+        # Optional multipart attachments — sent under keys: attachments,
+        # photos, photo, audio. We validate sizes BEFORE the order is
+        # saved so the client gets a clear 400; previously oversize
+        # files were silently dropped after the order had already been
+        # created, leaving an empty order with no explanation.
         files = []
         files += request.FILES.getlist("attachments")
         files += request.FILES.getlist("photos")
@@ -167,7 +171,14 @@ class OrderListCreateView(APIView):
         files += request.FILES.getlist("audio")
         for f in files:
             if f.size > _MAX_ATTACHMENT_BYTES:
-                continue
+                return Response(
+                    {"attachments": [
+                        f"'{f.name}' is {f.size // (1024*1024)} MB; max is "
+                        f"{_MAX_ATTACHMENT_BYTES // (1024*1024)} MB per file.",
+                    ]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        for f in files:
             OrderAttachment.objects.create(
                 order=order,
                 kind=_attachment_kind(f.name),

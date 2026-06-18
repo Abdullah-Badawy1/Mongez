@@ -144,7 +144,9 @@ class WorkerListView(APIView):
         paginator = WorkerPagination()
         page = paginator.paginate_queryset(queryset, request)
 
-        serializer = WorkerProfileSerializer(page, many=True)
+        serializer = WorkerProfileSerializer(
+            page, many=True, context={"request": request},
+        )
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -302,7 +304,9 @@ class WorkerCreateView(APIView):
         if serializer.is_valid():
             profile = serializer.save()
             return Response(
-                WorkerProfileSerializer(profile).data,
+                WorkerProfileSerializer(
+                    profile, context={"request": request},
+                ).data,
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -319,7 +323,11 @@ class WorkerDetailView(APIView):
                 {"error": "Worker not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(WorkerProfileSerializer(worker).data)
+        return Response(
+            WorkerProfileSerializer(
+                worker, context={"request": request},
+            ).data,
+        )
 
 
 class MyWorkerProfileView(APIView):
@@ -335,7 +343,11 @@ class MyWorkerProfileView(APIView):
                 {"error": "You do not have a worker profile yet."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(WorkerProfileSerializer(request.user.worker_profile).data)
+        return Response(
+            WorkerProfileSerializer(
+                request.user.worker_profile, context={"request": request},
+            ).data,
+        )
 
     def patch(self, request):
         if not hasattr(request.user, "worker_profile"):
@@ -351,5 +363,10 @@ class MyWorkerProfileView(APIView):
         )
         if serializer.is_valid():
             serializer.save()
-            return Response(WorkerProfileSerializer(request.user.worker_profile).data)
+            return Response(
+                WorkerProfileSerializer(
+                    request.user.worker_profile,
+                    context={"request": request},
+                ).data,
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

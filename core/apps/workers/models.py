@@ -1,3 +1,4 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from apps.users.models import User
 
@@ -6,7 +7,17 @@ class ServiceCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     name_ar = models.CharField(max_length=100, blank=True, help_text="Arabic name (الاسم بالعربية)")
     icon = models.CharField(max_length=64, blank=True, help_text="Optional icon name/key for the mobile app")
-    image = models.ImageField(upload_to="categories/", blank=True, null=True)
+    # FileField (not ImageField) so admins can upload SVG icons. Pillow
+    # rejects SVG, but mobile (flutter_svg) and the dashboard (<img>)
+    # render it fine. The validator keeps the allowlist explicit so
+    # someone can't upload arbitrary binaries.
+    image = models.FileField(
+        upload_to="categories/",
+        blank=True, null=True,
+        validators=[FileExtensionValidator(
+            allowed_extensions=["svg", "png", "jpg", "jpeg", "webp", "gif"],
+        )],
+    )
     description = models.CharField(max_length=255, blank=True)
     description_ar = models.CharField(max_length=255, blank=True)
 

@@ -4,7 +4,10 @@ from .models import ServiceCategory, WorkerProfile
 
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
-    image = serializers.ImageField(required=False, allow_null=True)
+    # FileField (not ImageField) — ImageField runs Pillow validation
+    # which rejects SVG. We trust the model-level extension validator
+    # to keep the allowlist tight.
+    image = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
         model = ServiceCategory

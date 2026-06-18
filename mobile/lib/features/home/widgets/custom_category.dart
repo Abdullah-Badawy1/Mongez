@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mongez/features/home/models/categories.dart';
 
 class CustomCategory extends StatelessWidget {
@@ -47,15 +48,25 @@ class CustomCategory extends StatelessWidget {
                   alignment: Alignment.center,
                   clipBehavior: Clip.antiAlias,
                   child: category.imageUrl != null
-                      ? Image.network(
-                          category.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
-                            category.iconData,
-                            color: cs.onPrimaryContainer,
-                            size: 30,
-                          ),
-                        )
+                      ? (category.isSvgImage
+                          ? SvgPicture.network(
+                              category.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholderBuilder: (_) => Icon(
+                                category.iconData,
+                                color: cs.onPrimaryContainer,
+                                size: 30,
+                              ),
+                            )
+                          : Image.network(
+                              category.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
+                                category.iconData,
+                                color: cs.onPrimaryContainer,
+                                size: 30,
+                              ),
+                            ))
                       : Icon(
                           category.iconData,
                           color: cs.onPrimaryContainer,

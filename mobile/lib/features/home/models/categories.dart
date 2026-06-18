@@ -39,8 +39,27 @@ class CategoriesModel extends Equatable {
     'description': description, 'description_ar': descriptionAr,
   };
 
-  String? get imageUrl =>
-      image != null && image!.isNotEmpty ? '${ApiConstants.baseUrl}$image' : null;
+  /// Resolves the category image to an absolute URL. The backend now
+  /// returns an already-absolute URL when serializers run with request
+  /// context, but older paths can still surface a `/media/...` string
+  /// here, so we normalize both cases.
+  String? get imageUrl {
+    final raw = image;
+    if (raw == null || raw.isEmpty) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    final base = ApiConstants.baseUrl;
+    final hostEnd = base.endsWith('/api/') ? base.length - 'api/'.length : base.length;
+    final host = base.substring(0, hostEnd).replaceAll(RegExp(r'/+$'), '');
+    final path = raw.startsWith('/') ? raw : '/$raw';
+    return '$host$path';
+  }
+
+  /// True when the category image is an SVG (needs SvgPicture, not
+  /// Image.network).
+  bool get isSvgImage {
+    final raw = image ?? '';
+    return raw.toLowerCase().endsWith('.svg');
+  }
 
   /// Locale-aware display name.
   String displayName(String languageCode) {

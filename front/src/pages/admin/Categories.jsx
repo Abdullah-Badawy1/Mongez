@@ -176,7 +176,7 @@ const Categories = () => {
                   {!editingCat && (
                     <div className="mb-3">
                       <label className="form-label" style={{ fontSize: '13px', fontWeight: '500' }}>Image (optional)</label>
-                      <input className="form-control" type="file" accept="image/*" onChange={(e) => setForm({...form, image: e.target.files[0]})} style={{ borderRadius: '10px', padding: '10px 14px' }} />
+                      <input className="form-control" type="file" accept="image/*,.svg" onChange={(e) => setForm({...form, image: e.target.files[0]})} style={{ borderRadius: '10px', padding: '10px 14px' }} />
                     </div>
                   )}
                 </div>

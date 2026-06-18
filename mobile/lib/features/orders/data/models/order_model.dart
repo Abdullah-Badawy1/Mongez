@@ -1,5 +1,16 @@
 import 'package:equatable/equatable.dart';
+import 'package:mongez/core/constants/api_constants.dart';
 import 'package:mongez/features/orders/data/models/order_attachment_model.dart';
+
+String? _absoluteMediaUrl(String? raw) {
+  if (raw == null || raw.isEmpty) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  final base = ApiConstants.baseUrl;
+  final hostEnd = base.endsWith('/api/') ? base.length - 'api/'.length : base.length;
+  final host = base.substring(0, hostEnd).replaceAll(RegExp(r'/+$'), '');
+  final path = raw.startsWith('/') ? raw : '/$raw';
+  return '$host$path';
+}
 
 enum OrderUrgency {
   low, normal, high;
@@ -143,11 +154,15 @@ class OrderModel extends Equatable {
       clientId: client?['id'] as int?,
       clientName: (client?['display_name'] ?? client?['name_ar'] ?? client?['username']) as String?,
       clientPhone: client?['phone'] as String?,
-      clientImage: (client?['avatar_url'] ?? client?['profile_image']) as String?,
+      clientImage: _absoluteMediaUrl(
+        (client?['avatar_url'] ?? client?['profile_image']) as String?,
+      ),
       workerId: worker?['id'] as int?,
       workerName: (worker?['display_name'] ?? worker?['name_ar'] ?? worker?['username']) as String?,
       workerPhone: worker?['phone'] as String?,
-      workerImage: (worker?['avatar_url'] ?? worker?['profile_image']) as String?,
+      workerImage: _absoluteMediaUrl(
+        (worker?['avatar_url'] ?? worker?['profile_image']) as String?,
+      ),
       categoryId: category?['id'] as int?,
       categoryName: category?['name'] as String?,
       categoryImage: (category?['icon'] ?? category?['image']) as String?,

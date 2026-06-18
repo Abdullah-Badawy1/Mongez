@@ -10,15 +10,19 @@ class DioClient {
 
   DioClient({VoidCallback? onUnauthorized}) {
     _onUnauthorized = onUnauthorized;
+    // No global Content-Type override. Dio infers the right header per
+    // request body: `application/json` for Maps, `multipart/form-data;
+    // boundary=…` for FormData. Hard-coding `application/json` here
+    // poisons multipart posts — Dio reuses our header instead of
+    // generating the boundary, so the backend sees a JSON-typed body
+    // it can't parse and silently drops `request.FILES`. That bug
+    // killed every photo/audio/avatar upload from the app.
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiConstants.baseUrl,
         connectTimeout: ApiConstants.connectTimeout,
         receiveTimeout: ApiConstants.receiveTimeout,
         sendTimeout: ApiConstants.sendTimeout,
-        headers: {
-          'Content-Type': 'application/json',
-        },
       ),
     );
 
