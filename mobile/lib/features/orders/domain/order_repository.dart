@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:mongez/errors/failure.dart';
 import 'package:mongez/features/orders/data/models/order_model.dart';
+import 'package:mongez/models/picked_attachment.dart';
 
 abstract class OrderRepository {
   Future<Either<Failure, List<OrderModel>>> getOrders();
@@ -14,7 +15,7 @@ abstract class OrderRepository {
     String? urgency,
     double? latitude,
     double? longitude,
-    List<String> photoPaths,
+    List<PickedAttachment> photos,
     String? audioPath,
     int? audioDurationSeconds,
   });

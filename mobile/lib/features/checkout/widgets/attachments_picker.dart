@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MissingPluginException;
+import 'package:mongez/models/picked_attachment.dart';
 import 'package:mongez/services/image_picker_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -15,22 +15,30 @@ import 'package:record/record.dart';
 /// MissingPluginException. Web is also excluded for now.
 bool get _audioRecordingSupported {
   if (kIsWeb) return false;
-  return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+      return true;
+    default:
+      return false;
+  }
 }
 
-/// Snapshot exposed to the parent — list of photo paths + an optional audio path.
+/// Snapshot exposed to the parent — list of picked photos + an optional
+/// audio path (native-only, since recording is gated above).
 class AttachmentBundle {
-  final List<String> photoPaths;
+  final List<PickedAttachment> photos;
   final String? audioPath;
   final int? audioDurationSeconds;
 
   const AttachmentBundle({
-    this.photoPaths = const [],
+    this.photos = const [],
     this.audioPath,
     this.audioDurationSeconds,
   });
 
-  bool get isEmpty => photoPaths.isEmpty && (audioPath?.isEmpty ?? true);
+  bool get isEmpty => photos.isEmpty && (audioPath?.isEmpty ?? true);
 }
 
 class AttachmentsPicker extends StatefulWidget {
@@ -46,7 +54,7 @@ class _AttachmentsPickerState extends State<AttachmentsPicker> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
 
-  final List<String> _photos = [];
+  final List<PickedAttachment> _photos = [];
   String? _audioPath;
   int? _audioDurationSeconds;
   bool _isRecording = false;
@@ -64,7 +72,7 @@ class _AttachmentsPickerState extends State<AttachmentsPicker> {
 
   void _emit() {
     widget.onChanged(AttachmentBundle(
-      photoPaths: List.unmodifiable(_photos),
+      photos: List.unmodifiable(_photos),
       audioPath: _audioPath,
       audioDurationSeconds: _audioDurationSeconds,
     ));
@@ -74,7 +82,7 @@ class _AttachmentsPickerState extends State<AttachmentsPicker> {
     try {
       final picked = await ImagePickerService.pickOne(fromCamera: true);
       if (picked != null) {
-        setState(() => _photos.add(picked.path));
+        setState(() => _photos.add(picked));
         _emit();
       }
     } on MissingPluginException catch (_) {
@@ -89,8 +97,7 @@ class _AttachmentsPickerState extends State<AttachmentsPicker> {
       final remaining = 5 - _photos.length;
       final files = await ImagePickerService.pickMulti(limit: remaining);
       if (files.isNotEmpty) {
-        setState(() =>
-            _photos.addAll(files.map((e) => e.path).take(remaining)));
+        setState(() => _photos.addAll(files.take(remaining)));
         _emit();
       }
     } on MissingPluginException catch (_) {
@@ -239,8 +246,8 @@ class _AttachmentsPickerState extends State<AttachmentsPicker> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.file(
-                        File(_photos[i]),
+                      child: Image.memory(
+                        _photos[i].bytes,
                         width: 88, height: 88, fit: BoxFit.cover,
                       ),
                     ),

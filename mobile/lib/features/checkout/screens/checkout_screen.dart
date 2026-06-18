@@ -69,7 +69,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       address: _useSavedAddress ? null : _addressController.text.trim(),
       phone: _useAccountPhone ? null : _phoneController.text.trim(),
       urgency: _urgency,
-      photoPaths: _attachments.photoPaths,
+      photos: _attachments.photos,
       audioPath: _attachments.audioPath,
       audioDurationSeconds: _attachments.audioDurationSeconds,
     );

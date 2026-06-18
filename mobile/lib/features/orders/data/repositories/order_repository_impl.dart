@@ -4,6 +4,7 @@ import 'package:mongez/core/constants/endpoints.dart';
 import 'package:mongez/errors/failure.dart';
 import 'package:mongez/features/orders/data/models/order_model.dart';
 import 'package:mongez/features/orders/domain/order_repository.dart';
+import 'package:mongez/models/picked_attachment.dart';
 import 'package:mongez/services/api_service.dart';
 
 class OrderRepositoryImpl implements OrderRepository {
@@ -49,12 +50,12 @@ class OrderRepositoryImpl implements OrderRepository {
     String? urgency,
     double? latitude,
     double? longitude,
-    List<String> photoPaths = const [],
+    List<PickedAttachment> photos = const [],
     String? audioPath,
     int? audioDurationSeconds,
   }) async {
     try {
-      final hasFiles = photoPaths.isNotEmpty || (audioPath?.isNotEmpty ?? false);
+      final hasFiles = photos.isNotEmpty || (audioPath?.isNotEmpty ?? false);
 
       if (!hasFiles) {
         final body = <String, dynamic>{
@@ -85,9 +86,16 @@ class OrderRepositoryImpl implements OrderRepository {
       }
 
       final form = FormData.fromMap(fields);
-      for (final p in photoPaths) {
-        form.files.add(MapEntry('photos', await MultipartFile.fromFile(p)));
+      // Photos go up as bytes so this path works on web (where
+      // MultipartFile.fromFile is a dart:io call that throws).
+      for (final p in photos) {
+        form.files.add(MapEntry(
+          'photos',
+          MultipartFile.fromBytes(p.bytes, filename: p.name),
+        ));
       }
+      // Audio recording is gated to native (see AttachmentsPicker), so we
+      // only ever hit fromFile here on platforms where it works.
       if (audioPath != null && audioPath.isNotEmpty) {
         form.files.add(MapEntry('audio', await MultipartFile.fromFile(audioPath)));
       }

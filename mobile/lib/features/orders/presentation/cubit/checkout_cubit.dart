@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:mongez/features/orders/data/models/order_model.dart';
 import 'package:mongez/features/orders/domain/order_repository.dart';
+import 'package:mongez/models/picked_attachment.dart';
 
 part 'checkout_state.dart';
 
@@ -21,7 +22,7 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     String? urgency,
     double? latitude,
     double? longitude,
-    List<String> photoPaths = const [],
+    List<PickedAttachment> photos = const [],
     String? audioPath,
     int? audioDurationSeconds,
   }) async {
@@ -35,7 +36,7 @@ class CheckoutCubit extends Cubit<CheckoutState> {
       urgency: urgency,
       latitude: latitude,
       longitude: longitude,
-      photoPaths: photoPaths,
+      photos: photos,
       audioPath: audioPath,
       audioDurationSeconds: audioDurationSeconds,
     );
