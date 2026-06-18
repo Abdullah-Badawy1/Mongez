@@ -6,7 +6,18 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+
+
+def _coerce_bool(value):
+    """Form-data sends booleans as strings; JSON sends actual booleans.
+    Normalize so admin patch endpoints can accept either."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    return str(value).strip().lower() in {"true", "1", "yes", "on"}
 
 from apps.users.models import User
 from apps.users.serializers import UserSerializer, RegisterSerializer
@@ -121,6 +132,8 @@ class AdminUserCreateView(APIView):
 
 class AdminUserDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    # MultiPartParser required so avatar uploads (FormData) reach the view.
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get(self, request, pk):
         if request.user.role != User.Role.ADMIN:
@@ -139,10 +152,28 @@ class AdminUserDetailView(APIView):
         except User.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        allowed_fields = ["username", "phone", "email", "address", "role", "is_active", "profile_image"]
-        data = {k: v for k, v in request.data.items() if k in allowed_fields}
-        for key, value in data.items():
-            setattr(user, key, value)
+        # `profile_image` was a legacy alias kept here for the older mobile
+        # build; it's been gone from both clients for a while now. Drop it.
+        text_fields = ["username", "phone", "email", "address", "city",
+                       "governorate", "name_ar", "role"]
+        for key in text_fields:
+            if key in request.data:
+                setattr(user, key, request.data.get(key))
+
+        if "is_active" in request.data:
+            user.is_active = _coerce_bool(request.data.get("is_active"))
+
+        # `avatar` arrives via request.FILES on multipart requests; DRF
+        # exposes it through request.data too, but reading FILES is more
+        # explicit about intent.
+        avatar = request.FILES.get("avatar")
+        if avatar is not None:
+            user.avatar = avatar
+
+        password = request.data.get("password")
+        if password:
+            user.set_password(password)
+
         user.save()
         return Response(UserSerializer(user, context={"request": request}).data)
 
@@ -324,6 +355,7 @@ class AdminWorkerListView(APIView):
                 "accept_rate": profile.accept_rate if profile else 0.0,
                 "is_available": profile.is_available if profile else False,
                 "is_verified": profile.is_verified if profile else False,
+                "is_featured": profile.is_featured if profile else False,
                 "score": round(profile.calculate_score(), 2) if profile else 0.0,
                 "created_at": profile.created_at.isoformat() if profile and profile.created_at else u.date_joined.isoformat(),
                 "has_profile": profile is not None,
@@ -341,6 +373,7 @@ class AdminWorkerListView(APIView):
 
 class AdminWorkerDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get(self, request, pk):
         if request.user.role != User.Role.ADMIN:
@@ -350,6 +383,37 @@ class AdminWorkerDetailView(APIView):
         except WorkerProfile.DoesNotExist:
             return Response({"error": "Worker not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(WorkerProfileSerializer(profile, context={"request": request}).data)
+
+    def patch(self, request, pk):
+        """Admin-side worker update: avatar (lives on User), plus a handful
+        of moderation toggles on WorkerProfile. Anything more substantial
+        (profession, bio, rates) belongs on the worker self-edit endpoint
+        so the audit trail stays clean."""
+        if request.user.role != User.Role.ADMIN:
+            return Response({"error": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            profile = WorkerProfile.objects.select_related("user").get(pk=pk)
+        except WorkerProfile.DoesNotExist:
+            return Response({"error": "Worker not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Avatar lives on User, not WorkerProfile.
+        avatar = request.FILES.get("avatar")
+        if avatar is not None:
+            profile.user.avatar = avatar
+            profile.user.save(update_fields=["avatar"])
+
+        bool_fields = ["is_verified", "is_featured", "is_available"]
+        dirty = []
+        for key in bool_fields:
+            if key in request.data:
+                setattr(profile, key, _coerce_bool(request.data.get(key)))
+                dirty.append(key)
+        if dirty:
+            profile.save(update_fields=dirty)
+
+        return Response(
+            WorkerProfileSerializer(profile, context={"request": request}).data,
+        )
 
 
 class AdminRatingListView(APIView):

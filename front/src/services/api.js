@@ -170,6 +170,7 @@ export const adminAPI = {
   workers: {
     list: (params) => api.get('/admin/workers/', { params }),
     detail: (id) => api.get(`/admin/workers/${id}/`),
+    update: (id, data) => api.patch(`/admin/workers/${id}/`, data),
   },
   exports: {
     orders: () => api.get('/admin/export/orders.csv', { responseType: 'blob' }),

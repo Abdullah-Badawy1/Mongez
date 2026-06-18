@@ -12,6 +12,8 @@ const roleColors = {
 const emptyForm = {
   username: '', phone: '', email: '', password: '', role: 'client',
   governorate: '', city: '', address: '', is_active: true,
+  avatar: null,           // File object when admin picked a new avatar
+  avatarPreview: null,    // existing avatar_url, shown until replaced
 };
 
 const Users = () => {
@@ -91,6 +93,8 @@ const Users = () => {
       city: user.city || '',
       address: user.address || '',
       is_active: user.is_active !== undefined ? user.is_active : true,
+      avatar: null,
+      avatarPreview: user.avatar_url || null,
     });
     setFormError(null);
     setShowModal(true);
@@ -102,11 +106,28 @@ const Users = () => {
     setFormError(null);
     try {
       if (editingUser) {
-        const payload = { ...form };
-        if (!payload.password) delete payload.password;
-        await adminAPI.users.update(editingUser.id, payload);
+        // Switch transport based on intent. JSON when no avatar change
+        // (smaller payload + cleaner errors); FormData when a file is
+        // staged so the backend sees request.FILES['avatar'].
+        if (form.avatar instanceof File) {
+          const fd = new FormData();
+          const scalar = ['username', 'phone', 'email', 'role',
+                          'governorate', 'city', 'address'];
+          scalar.forEach((k) => {
+            if (form[k] != null) fd.append(k, form[k]);
+          });
+          fd.append('is_active', form.is_active ? 'true' : 'false');
+          if (form.password) fd.append('password', form.password);
+          fd.append('avatar', form.avatar);
+          await adminAPI.users.update(editingUser.id, fd);
+        } else {
+          const { avatar, avatarPreview, ...rest } = form;
+          if (!rest.password) delete rest.password;
+          await adminAPI.users.update(editingUser.id, rest);
+        }
       } else {
-        await adminAPI.users.create(form);
+        const { avatar, avatarPreview, ...rest } = form;
+        await adminAPI.users.create(rest);
       }
       setShowModal(false);
       refresh();
@@ -241,8 +262,12 @@ const Users = () => {
                       <td style={{ fontWeight: '500' }}>#{user.id}</td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
-                          <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', backgroundColor: '#6366f115', color: '#6366f1', fontSize: '13px', fontWeight: '600' }}>
-                            {user.username?.[0]?.toUpperCase() || '?'}
+                          <div className="rounded-circle d-flex align-items-center justify-content-center overflow-hidden" style={{ width: '32px', height: '32px', backgroundColor: '#6366f115', color: '#6366f1', fontSize: '13px', fontWeight: '600' }}>
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              user.username?.[0]?.toUpperCase() || '?'
+                            )}
                           </div>
                           {user.username}
                         </div>
@@ -315,6 +340,45 @@ const Users = () => {
                     <div className="alert alert-danger py-2 px-3" style={{ borderRadius: '10px', fontSize: '13px', border: 'none' }}>
                       <i className="bi bi-exclamation-circle me-1"></i>
                       {formError.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+                    </div>
+                  )}
+                  {editingUser && (
+                    <div className="mb-3 d-flex align-items-center gap-3">
+                      <div style={{
+                        width: 64, height: 64, borderRadius: '50%',
+                        background: '#f1f5f9', overflow: 'hidden',
+                        display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: '#94a3b8',
+                        fontWeight: 700, fontSize: 22, flexShrink: 0,
+                      }}>
+                        {form.avatar instanceof File ? (
+                          <img alt="" src={URL.createObjectURL(form.avatar)}
+                               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : form.avatarPreview ? (
+                          <img alt="" src={form.avatarPreview}
+                               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          (form.username?.[0] || '?').toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-grow-1">
+                        <label className="form-label mb-1" style={{ fontSize: '13px', fontWeight: 500 }}>
+                          Profile picture
+                        </label>
+                        <input
+                          className="form-control"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setForm({ ...form, avatar: e.target.files[0] || null })}
+                          style={{ borderRadius: '10px' }}
+                        />
+                        {form.avatar instanceof File && (
+                          <button type="button" className="btn btn-link btn-sm p-0 mt-1" style={{ fontSize: 12 }}
+                                  onClick={() => setForm({ ...form, avatar: null })}>
+                            Cancel selection
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div className="mb-3">
