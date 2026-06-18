@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:mongez/core/app_colors.dart';
 
-/// Mongez brand mark. Renders the SVG logo when available, falls back to
-/// a plain wordmark if the asset bundle can't load it (older builds /
-/// missing asset). `compact` shrinks the layout for use inside an
-/// AppBar.
+/// Mongez brand mark. Renders the user-supplied logo image with a
+/// bilingual wordmark beside it. `compact` shrinks the layout for use
+/// inside an AppBar.
 class Logo extends StatelessWidget {
   final bool compact;
   const Logo({super.key, this.compact = false});
@@ -20,20 +18,13 @@ class Logo extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SvgPicture.asset(
-          'assets/images/logo-mark.svg',
-          width: markSize,
-          height: markSize,
-          placeholderBuilder: (_) => Container(
+        ClipRRect(
+          borderRadius: BorderRadius.circular(markSize * 0.22),
+          child: Image.asset(
+            'assets/images/logo.jpg',
             width: markSize,
             height: markSize,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(markSize * 0.25),
-            ),
-            alignment: Alignment.center,
-            child: Icon(Icons.build_rounded,
-                color: Colors.white, size: markSize * 0.55),
+            fit: BoxFit.cover,
           ),
         ),
         SizedBox(width: gap),

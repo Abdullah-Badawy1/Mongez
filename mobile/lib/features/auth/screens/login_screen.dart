@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:mongez/features/auth/bloc/login_cubit/auth_cubit.dart';
 import 'package:mongez/features/auth/screens/register_screen.dart';
 import 'package:mongez/generated/l10n.dart';
@@ -182,9 +181,8 @@ class _BrandMark extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: cs.primary.withValues(alpha: 0.22),
@@ -193,10 +191,14 @@ class _BrandMark extends StatelessWidget {
               ),
             ],
           ),
-          child: SvgPicture.asset(
-            'assets/images/logo-mark.svg',
-            width: 72,
-            height: 72,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.asset(
+              'assets/images/logo.jpg',
+              width: 84,
+              height: 84,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         const SizedBox(height: 12),

@@ -42,9 +42,9 @@ const Sidebar = ({ isRtl }) => {
         onClick={() => navigate('/admin')}
       >
         <img
-          src="/logo-mark.svg"
+          src="/logo.jpg"
           alt="Mongez"
-          style={{ width: '44px', height: '44px' }}
+          style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '10px' }}
           className="me-2"
         />
         <div className="d-flex flex-column lh-sm">
