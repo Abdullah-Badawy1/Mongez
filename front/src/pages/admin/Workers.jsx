@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const Workers = () => {
   const [search, setSearch] = useState('');
@@ -146,6 +147,7 @@ const Workers = () => {
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
             <i className="bi bi-arrow-repeat"></i>
           </button>
+          <ExportCsvButton fetcher={adminAPI.exports.workers} filename="workers.csv" />
         </div>
       </div>
 

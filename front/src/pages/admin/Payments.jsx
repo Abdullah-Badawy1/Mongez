@@ -2,6 +2,7 @@ import React from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const paymentColors = {
   AUTHORIZED: { bg: '#3b82f620', color: '#3b82f6' },
@@ -70,6 +71,7 @@ const Payments = () => {
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
             <i className="bi bi-arrow-repeat"></i>
           </button>
+          <ExportCsvButton fetcher={adminAPI.exports.payments} filename="payments.csv" />
         </div>
       </div>
 

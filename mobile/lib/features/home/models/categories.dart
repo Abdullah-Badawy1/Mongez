@@ -48,6 +48,16 @@ class CategoriesModel extends Equatable {
     return name ?? '';
   }
 
+  /// Bilingual label "English — Arabic" for pickers that should show
+  /// both at once (e.g. worker sign-up category dropdown). Falls back
+  /// to whichever side is populated.
+  String get bilingualLabel {
+    final en = (name ?? '').trim();
+    final ar = (nameAr ?? '').trim();
+    if (en.isNotEmpty && ar.isNotEmpty) return '$en — $ar';
+    return en.isNotEmpty ? en : ar;
+  }
+
   /// Map backend icon key → Material Icons. Falls back to a category icon.
   IconData get iconData {
     switch ((icon ?? '').toLowerCase()) {

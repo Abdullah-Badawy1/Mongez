@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:mongez/features/auth/bloc/login_cubit/auth_cubit.dart';
 import 'package:mongez/features/auth/screens/register_screen.dart';
 import 'package:mongez/generated/l10n.dart';
@@ -181,32 +182,39 @@ class _BrandMark extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 72,
-          height: 72,
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [cs.primary, cs.primary.withValues(alpha: 0.75)],
-            ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: cs.primary.withValues(alpha: 0.25),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: cs.primary.withValues(alpha: 0.22),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: Icon(Icons.handyman_rounded,
-              size: 36, color: cs.onPrimary),
+          child: SvgPicture.asset(
+            'assets/images/logo-mark.svg',
+            width: 72,
+            height: 72,
+          ),
         ),
         const SizedBox(height: 12),
         Text(
           'Mongez',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 22,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'منجز',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
+                color: cs.primary,
               ),
         ),
       ],

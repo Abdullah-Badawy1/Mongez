@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { adminAPI, referenceAPI } from '../../services/api';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const roleColors = {
   admin: { bg: '#ef444420', color: '#ef4444' },
@@ -170,6 +171,7 @@ const Users = () => {
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
             <i className="bi bi-arrow-repeat"></i>
           </button>
+          <ExportCsvButton fetcher={adminAPI.exports.users} filename="users.csv" />
           <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#6366f1', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
             <i className="bi bi-plus-lg"></i> Add User
           </button>

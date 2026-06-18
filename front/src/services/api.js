@@ -171,6 +171,12 @@ export const adminAPI = {
     list: (params) => api.get('/admin/workers/', { params }),
     detail: (id) => api.get(`/admin/workers/${id}/`),
   },
+  exports: {
+    orders: () => api.get('/admin/export/orders.csv', { responseType: 'blob' }),
+    workers: () => api.get('/admin/export/workers.csv', { responseType: 'blob' }),
+    users: () => api.get('/admin/export/users.csv', { responseType: 'blob' }),
+    payments: () => api.get('/admin/export/payments.csv', { responseType: 'blob' }),
+  },
 };
 
 export default api;

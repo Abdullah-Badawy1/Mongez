@@ -115,7 +115,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           .where((c) => c.id != null)
                           .map((c) => DropdownMenuItem(
                                 value: c.id,
-                                child: Text(c.name ?? ''),
+                                child: Text(c.bilingualLabel),
                               ))
                           .toList(),
                       onChanged: (v) => setState(() => _selectedCategoryId = v),

@@ -12,4 +12,8 @@ urlpatterns = [
     path("admin/workers/", views.AdminWorkerListView.as_view(), name="admin-worker-list"),
     path("admin/workers/<int:pk>/", views.AdminWorkerDetailView.as_view(), name="admin-worker-detail"),
     path("admin/ratings/", views.AdminRatingListView.as_view(), name="admin-rating-list"),
+    path("admin/export/orders.csv", views.AdminOrdersCSVView.as_view(), name="admin-export-orders"),
+    path("admin/export/workers.csv", views.AdminWorkersCSVView.as_view(), name="admin-export-workers"),
+    path("admin/export/users.csv", views.AdminUsersCSVView.as_view(), name="admin-export-users"),
+    path("admin/export/payments.csv", views.AdminPaymentsCSVView.as_view(), name="admin-export-payments"),
 ]

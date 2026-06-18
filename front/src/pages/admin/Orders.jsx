@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { ordersAPI, adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const statusColors = {
   PENDING: { bg: '#f59e0b20', color: '#f59e0b' },
@@ -127,6 +128,7 @@ const Orders = () => {
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
             <i className="bi bi-arrow-repeat"></i>
           </button>
+          <ExportCsvButton fetcher={adminAPI.exports.orders} filename="orders.csv" />
           <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ borderRadius: '10px', padding: '8px 14px', minWidth: '180px' }}>
             <option value="">All Statuses</option>
             {allStatuses.map((s) => (

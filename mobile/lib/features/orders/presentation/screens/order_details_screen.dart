@@ -1,5 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mongez/core/app_colors.dart';
 import 'package:mongez/features/orders/data/models/order_attachment_model.dart';
@@ -120,15 +121,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  _infoRow(Icons.person_outline, widget.isCustomer
-                      ? '${lang.serviceProvider}: ${_order.workerName ?? '—'}'
-                      : '${lang.customer}: ${_order.clientName ?? '—'}'),
-                  if (_order.clientPhone != null || _order.workerPhone != null)
-                    _infoRow(Icons.phone_outlined, _order.clientPhone ?? _order.workerPhone ?? ''),
-                  if (_order.address.isNotEmpty)
-                    _infoRow(Icons.location_on_outlined, _order.address),
-                  if (_order.phone.isNotEmpty)
-                    _infoRow(Icons.phone_iphone, 'Phone: ${_order.phone}'),
                   _infoRow(Icons.calendar_today_outlined, _formatDate(_order.createdAt)),
                   if (_order.acceptedAt != null)
                     _infoRow(Icons.check_circle_outline,
@@ -136,11 +128,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   if (_order.completedAt != null)
                     _infoRow(Icons.task_alt,
                         'Completed: ${_formatDate(_order.completedAt)}'),
-                  if (_order.latitude != null && _order.longitude != null)
-                    _infoRow(
-                      Icons.my_location_outlined,
-                      'Pin: ${_order.latitude!.toStringAsFixed(5)}, ${_order.longitude!.toStringAsFixed(5)}',
-                    ),
+                  const SizedBox(height: 16),
+                  _ContactCard(
+                    order: _order,
+                    isCustomer: widget.isCustomer,
+                    onCopy: (label, value) => _copyToClipboard(context, label, value),
+                  ),
                   const SizedBox(height: 16),
                   _buildDetailsActions(context),
                 ],
@@ -237,6 +230,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _copyToClipboard(
+    BuildContext context,
+    String label,
+    String value,
+  ) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -547,6 +555,171 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 }
 
 // ─── Supporting widgets ────────────────────────────────────────────────
+
+class _ContactCard extends StatelessWidget {
+  final OrderModel order;
+  final bool isCustomer;
+  final void Function(String label, String value) onCopy;
+
+  const _ContactCard({
+    required this.order,
+    required this.isCustomer,
+    required this.onCopy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final lang = S.of(context);
+
+    // When the worker is viewing, show client info. When the client is
+    // viewing, show worker info. The card is identical in shape.
+    final isWorkerView = !isCustomer;
+    final name = isWorkerView ? order.clientName : order.workerName;
+    final phone = isWorkerView ? order.clientPhone : order.workerPhone;
+    final avatar = isWorkerView ? order.clientImage : order.workerImage;
+    final heading = isWorkerView ? lang.customer : lang.serviceProvider;
+
+    // For a worker, location is essential — make it the visual anchor.
+    final hasLocation = order.latitude != null && order.longitude != null;
+    final hasAddress = order.address.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: cs.primary.withValues(alpha: 0.15),
+                backgroundImage: (avatar != null && avatar.isNotEmpty)
+                    ? NetworkImage(avatar)
+                    : null,
+                child: (avatar == null || avatar.isEmpty)
+                    ? Icon(Icons.person, color: cs.primary)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      heading,
+                      style: tt.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.55),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name ?? '—',
+                      style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (phone != null && phone.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _TappableRow(
+              icon: Icons.phone_outlined,
+              label: phone,
+              hint: 'Tap to copy',
+              onTap: () => onCopy('Phone', phone),
+            ),
+          ],
+          if (hasAddress) ...[
+            const SizedBox(height: 8),
+            _TappableRow(
+              icon: Icons.location_on_outlined,
+              label: order.address,
+              hint: 'Tap to copy',
+              onTap: () => onCopy('Address', order.address),
+            ),
+          ],
+          if (hasLocation) ...[
+            const SizedBox(height: 8),
+            _TappableRow(
+              icon: Icons.map_outlined,
+              label:
+                  '${order.latitude!.toStringAsFixed(5)}, ${order.longitude!.toStringAsFixed(5)}',
+              hint: 'Tap to copy Google Maps link',
+              onTap: () => onCopy(
+                'Maps link',
+                'https://www.google.com/maps?q=${order.latitude},${order.longitude}',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TappableRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? hint;
+  final VoidCallback onTap;
+
+  const _TappableRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: cs.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  if (hint != null)
+                    Text(
+                      hint!,
+                      style: tt.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.copy_rounded,
+                size: 16, color: cs.onSurface.withValues(alpha: 0.4)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _UrgencyPill extends StatelessWidget {
   final OrderUrgency urgency;

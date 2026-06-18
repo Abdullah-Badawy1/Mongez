@@ -1,5 +1,7 @@
+import csv
 from django.core.cache import cache
 from django.db.models import Count, Sum, Q
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -370,3 +372,178 @@ class AdminRatingListView(APIView):
         return Response(
             AdminRatingSerializer(ratings, many=True, context={"request": request}).data,
         )
+
+
+# ── CSV exports ────────────────────────────────────────────────────────
+# Used by the admin dashboard's "Export CSV" buttons. Each view streams
+# a UTF-8 CSV with a BOM so Excel opens Arabic text correctly. Volumes
+# are small (a few thousand rows at this stage), so we materialize the
+# CSV in one HttpResponse instead of streaming.
+
+def _csv_response(filename):
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    # BOM so Excel detects UTF-8 (otherwise Arabic shows as mojibake).
+    response.write("﻿")
+    return response
+
+
+def _require_admin(request):
+    if request.user.role != User.Role.ADMIN:
+        return Response(
+            {"error": "Admin access required."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+class AdminOrdersCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        denied = _require_admin(request)
+        if denied is not None:
+            return denied
+        response = _csv_response("orders.csv")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "status", "urgency", "category", "category_ar",
+            "client_username", "client_name", "client_phone",
+            "worker_username", "worker_name", "worker_phone",
+            "address", "latitude", "longitude",
+            "commission", "created_at", "accepted_at",
+            "completed_at", "cancelled_at",
+        ])
+        qs = (
+            Order.objects
+            .select_related("client", "worker", "service_category")
+            .order_by("-created_at")
+        )
+        for o in qs.iterator(chunk_size=500):
+            cat = o.service_category
+            writer.writerow([
+                o.id, o.status, o.urgency,
+                cat.name if cat else "",
+                cat.name_ar if cat else "",
+                o.client.username if o.client_id else "",
+                (o.client.name_ar or o.client.get_full_name() or "") if o.client_id else "",
+                o.client.phone if o.client_id else "",
+                o.worker.username if o.worker_id else "",
+                (o.worker.name_ar or o.worker.get_full_name() or "") if o.worker_id else "",
+                o.worker.phone if o.worker_id else "",
+                o.address_text or "",
+                o.latitude if o.latitude is not None else "",
+                o.longitude if o.longitude is not None else "",
+                o.commission,
+                o.created_at.isoformat() if o.created_at else "",
+                o.accepted_at.isoformat() if o.accepted_at else "",
+                o.completed_at.isoformat() if o.completed_at else "",
+                o.cancelled_at.isoformat() if o.cancelled_at else "",
+            ])
+        return response
+
+
+class AdminWorkersCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        denied = _require_admin(request)
+        if denied is not None:
+            return denied
+        response = _csv_response("workers.csv")
+        writer = csv.writer(response)
+        writer.writerow([
+            "user_id", "username", "name", "phone", "email",
+            "governorate", "city", "is_active",
+            "profession", "profession_ar", "experience_years",
+            "average_rating", "completed_jobs", "accept_rate",
+            "is_available", "is_verified", "is_featured",
+            "hourly_rate", "minimum_charge", "currency",
+            "date_joined", "profile_created_at",
+        ])
+        qs = (
+            User.objects.filter(role=User.Role.WORKER)
+            .select_related("worker_profile")
+            .order_by("-date_joined")
+        )
+        for u in qs.iterator(chunk_size=500):
+            p = getattr(u, "worker_profile", None)
+            writer.writerow([
+                u.id, u.username,
+                u.name_ar or u.get_full_name() or "",
+                u.phone, u.email, u.governorate, u.city, u.is_active,
+                p.profession if p else "",
+                p.profession_ar if p else "",
+                p.experience_years if p else "",
+                p.average_rating if p else "",
+                p.completed_jobs if p else "",
+                p.accept_rate if p else "",
+                p.is_available if p else "",
+                p.is_verified if p else "",
+                p.is_featured if p else "",
+                p.hourly_rate if p and p.hourly_rate is not None else "",
+                p.minimum_charge if p and p.minimum_charge is not None else "",
+                p.currency if p else "",
+                u.date_joined.isoformat() if u.date_joined else "",
+                p.created_at.isoformat() if p and p.created_at else "",
+            ])
+        return response
+
+
+class AdminUsersCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        denied = _require_admin(request)
+        if denied is not None:
+            return denied
+        response = _csv_response("users.csv")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "username", "name", "email", "phone",
+            "role", "governorate", "city", "address",
+            "is_active", "is_staff", "date_joined", "last_login",
+        ])
+        qs = User.objects.order_by("-date_joined")
+        for u in qs.iterator(chunk_size=500):
+            writer.writerow([
+                u.id, u.username,
+                u.name_ar or u.get_full_name() or "",
+                u.email, u.phone, u.role,
+                u.governorate, u.city, u.address,
+                u.is_active, u.is_staff,
+                u.date_joined.isoformat() if u.date_joined else "",
+                u.last_login.isoformat() if u.last_login else "",
+            ])
+        return response
+
+
+class AdminPaymentsCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        denied = _require_admin(request)
+        if denied is not None:
+            return denied
+        response = _csv_response("payments.csv")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "order_id", "amount", "payment_status",
+            "paymob_order_id", "paymob_transaction_id",
+            "created_at", "updated_at",
+        ])
+        qs = (
+            CommissionPayment.objects.select_related("order")
+            .order_by("-created_at")
+        )
+        for p in qs.iterator(chunk_size=500):
+            writer.writerow([
+                p.id, p.order_id,
+                p.amount,
+                p.payment_status,
+                p.paymob_order_id or "",
+                p.paymob_transaction_id or "",
+                p.created_at.isoformat() if p.created_at else "",
+                p.updated_at.isoformat() if p.updated_at else "",
+            ])
+        return response

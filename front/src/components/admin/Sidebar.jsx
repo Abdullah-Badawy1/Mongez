@@ -2,7 +2,6 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/images/a.png';
 
 const menuItems = [
   { path: '/admin', label: 'Dashboard', icon: 'bi-speedometer2', end: true },
@@ -38,17 +37,24 @@ const Sidebar = ({ isRtl }) => {
       }}
     >
       <div
-        className="d-flex align-items-center justify-content-center py-4 border-bottom"
+        className="d-flex align-items-center justify-content-center py-4 px-3 border-bottom"
         style={{ borderColor: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}
         onClick={() => navigate('/admin')}
       >
         <img
-          src={logo}
+          src="/logo-mark.svg"
           alt="Mongez"
-          style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+          style={{ width: '44px', height: '44px' }}
           className="me-2"
         />
-        <span className="fw-bold fs-4 text-white">منجز</span>
+        <div className="d-flex flex-column lh-sm">
+          <span className="fw-bold text-white" style={{ fontSize: '20px', letterSpacing: '-0.3px' }}>
+            Mongez
+          </span>
+          <span className="text-white-50" style={{ fontSize: '13px', fontWeight: 600 }}>
+            منجز
+          </span>
+        </div>
       </div>
 
       <div className="px-3 mt-3">
