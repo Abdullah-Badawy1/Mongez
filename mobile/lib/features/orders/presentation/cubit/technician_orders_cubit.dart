@@ -29,13 +29,14 @@ class TechnicianOrdersCubit extends Cubit<TechnicianOrdersState> {
     await _loadOrders();
   }
 
-  /// Background poll — same 30 s cadence as NotificationCubit so a new
-  /// PENDING order assigned by a client (or a CANCELLED flip from the
-  /// dashboard) lands on the worker's screen without manual refresh.
+  /// Background poll — 5 s so a new PENDING assignment (or a CANCELLED
+  /// flip from the dashboard) lands on the worker's screen almost
+  /// immediately. Matches NotificationCubit so the order list refresh
+  /// and the status-change push fire in the same tick.
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 5),
       (_) => _loadOrders(),
     );
     _loadOrders();

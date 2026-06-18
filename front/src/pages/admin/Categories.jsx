@@ -13,10 +13,10 @@ const Categories = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formError, setFormError] = useState(null);
 
-  // 60 s — categories are basically static; we just want them to refresh
-  // automatically if another admin adds one in a parallel session.
+  // 5 s — categories don't change often, but when an admin adds one we
+  // want it to show up in other open sessions quickly.
   const { data: categories, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchCategories, { intervalMs: 20_000, initialData: [] });
+    usePolling(fetchCategories, { intervalMs: 5_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const openAdd = () => {

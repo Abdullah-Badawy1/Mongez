@@ -6,10 +6,10 @@ import { usePolling, useTimeAgo } from '../../hooks/usePolling';
 const fetchRatings = () => adminAPI.ratings.list().then((res) => res.data || []);
 
 const Ratings = () => {
-  // 30 s — ratings only land at order-complete time, so we don't need a
-  // tight loop here.
+  // 5 s — when an order completes we want the new rating to surface on
+  // the moderation page right away.
   const { data: ratings, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchRatings, { intervalMs: 10_000, initialData: [] });
+    usePolling(fetchRatings, { intervalMs: 5_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const fmtDate = (iso) => {

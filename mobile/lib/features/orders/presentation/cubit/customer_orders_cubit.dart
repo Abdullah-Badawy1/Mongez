@@ -29,13 +29,14 @@ class CustomerOrdersCubit extends Cubit<CustomerOrdersState> {
     await _loadOrders();
   }
 
-  /// Background poll — same 30 s cadence as NotificationCubit. Refreshes
-  /// the client's order list silently so an admin or worker status change
-  /// shows up without manual pull-to-refresh.
+  /// Background poll — 5 s so an admin or worker status change shows up
+  /// almost as soon as it's committed. Match NotificationCubit so a
+  /// status-change push notification + a list refresh land in the same
+  /// tick.
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 5),
       (_) => _loadOrders(),
     );
     _loadOrders();

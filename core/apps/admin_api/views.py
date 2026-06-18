@@ -37,7 +37,14 @@ def admin_only(request):
 
 
 _DASHBOARD_STATS_CACHE_KEY = "admin_api:dashboard_stats:v1"
-_DASHBOARD_STATS_TTL = 5  # seconds
+_DASHBOARD_STATS_TTL = 2  # seconds — admins want near-realtime numbers
+
+
+def _bust_dashboard_cache():
+    """Clear the dashboard stats aggregate after any mutation so the next
+    poll (dashboard polls every 3 s) reflects the change immediately
+    instead of waiting up to a TTL window."""
+    cache.delete(_DASHBOARD_STATS_CACHE_KEY)
 
 
 class AdminDashboardView(APIView):
@@ -126,6 +133,7 @@ class AdminUserCreateView(APIView):
         serializer = RegisterSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
             user = serializer.save()
+            _bust_dashboard_cache()
             return Response(UserSerializer(user, context={"request": request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -175,6 +183,7 @@ class AdminUserDetailView(APIView):
             user.set_password(password)
 
         user.save()
+        _bust_dashboard_cache()
         return Response(UserSerializer(user, context={"request": request}).data)
 
     def delete(self, request, pk):
@@ -185,6 +194,7 @@ class AdminUserDetailView(APIView):
         except User.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
         user.delete()
+        _bust_dashboard_cache()
         return Response({"message": "User deleted."}, status=status.HTTP_204_NO_CONTENT)
 
 
@@ -201,6 +211,7 @@ class AdminCategoryUpdateDeleteView(APIView):
         serializer = ServiceCategorySerializer(category, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
             serializer.save()
+            _bust_dashboard_cache()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -212,6 +223,7 @@ class AdminCategoryUpdateDeleteView(APIView):
         except ServiceCategory.DoesNotExist:
             return Response({"error": "Category not found."}, status=status.HTTP_404_NOT_FOUND)
         category.delete()
+        _bust_dashboard_cache()
         return Response({"message": "Category deleted."}, status=status.HTTP_204_NO_CONTENT)
 
 
@@ -268,6 +280,7 @@ class AdminOrderStatusView(APIView):
         elif new_status == Order.CANCELLED and not order.cancelled_at:
             order.cancelled_at = now
         order.save()
+        _bust_dashboard_cache()
 
         # Fan out to the affected client (and worker, if assigned) so the
         # mobile sees the dashboard action immediately via the notification
@@ -410,6 +423,8 @@ class AdminWorkerDetailView(APIView):
                 dirty.append(key)
         if dirty:
             profile.save(update_fields=dirty)
+        if avatar is not None or dirty:
+            _bust_dashboard_cache()
 
         return Response(
             WorkerProfileSerializer(profile, context={"request": request}).data,

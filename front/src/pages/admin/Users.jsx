@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { adminAPI, referenceAPI } from '../../services/api';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const roleColors = {
@@ -49,18 +50,23 @@ const Users = () => {
   // (yet) support `governorate=` as a query param on /api/admin/users/,
   // so we apply that filter client-side after the fetch — small list of
   // 27 codes makes this trivially cheap.
+  // Debounce the search input so typing doesn't fire one request per
+  // keystroke; only the last 300 ms-stable value drives the fetcher.
+  const debouncedSearch = useDebouncedValue(search, 300);
+
   const fetchUsers = useCallback(async () => {
     const params = { page, page_size: pageSize };
-    if (search) params.search = search;
+    if (debouncedSearch) params.search = debouncedSearch;
     if (roleFilter) params.role = roleFilter;
     const res = await adminAPI.users.list(params);
     return { results: res.data.results, count: res.data.count };
-  }, [page, search, roleFilter]);
+  }, [page, debouncedSearch, roleFilter]);
 
-  // 30 s — admins rarely watch the user list move; refresh is cheap when
-  // filter or page changes, otherwise let the user reach for the button.
+  // 4 s — admins want changes from other admins / the mobile to land
+  // quickly. The backend stats cache TTL is 2 s and gets busted on
+  // every mutation, so this is the bottleneck.
   const { data, loading, lastUpdatedAt, refresh } = usePolling(fetchUsers, {
-    intervalMs: 10_000,
+    intervalMs: 4_000,
     initialData: { results: [], count: 0 },
   });
   const allUsers = data?.results || [];

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { adminAPI } from '../../services/api';
 import Table from '../../components/admin/Table';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const emptyEditForm = {
@@ -21,17 +22,22 @@ const Workers = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState(null);
 
+  // Debounce so typing in the search box doesn't fire one query per
+  // keystroke.
+  const debouncedSearch = useDebouncedValue(search, 300);
+
   const fetchWorkers = useCallback(async () => {
     const params = { page_size: 50 };
-    if (search) params.search = search;
+    if (debouncedSearch) params.search = debouncedSearch;
     if (profileFilter) params.status = profileFilter;
     const res = await adminAPI.workers.list(params);
     return res.data;
-  }, [search, profileFilter]);
+  }, [debouncedSearch, profileFilter]);
 
-  // 30 s — worker profiles change slowly (rating updates, availability).
+  // 4 s — admin moderation actions (verify/feature/availability) should
+  // surface across other admin sessions quickly.
   const { data, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchWorkers, { intervalMs: 10_000, initialData: { results: [], count: 0, complete_count: 0, incomplete_count: 0 } });
+    usePolling(fetchWorkers, { intervalMs: 4_000, initialData: { results: [], count: 0, complete_count: 0, incomplete_count: 0 } });
   const workers = data?.results || [];
   const total = data?.count || 0;
   const completeCount = data?.complete_count || 0;

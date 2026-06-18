@@ -14,10 +14,10 @@ const paymentColors = {
 const fetchPayments = () => adminAPI.payments.list().then((res) => res.data || []);
 
 const Payments = () => {
-  // 15 s — Paymob webhooks land out-of-band; this is roughly how often we
-  // want the admin to see CAPTURE/FAILED transitions catch up.
+  // 3 s — Paymob webhooks land out-of-band; admins want CAPTURE/FAILED
+  // transitions visible almost as soon as the webhook fires.
   const { data: payments, loading, lastUpdatedAt, refresh } =
-    usePolling(fetchPayments, { intervalMs: 5_000, initialData: [] });
+    usePolling(fetchPayments, { intervalMs: 3_000, initialData: [] });
   const updatedLabel = useTimeAgo(lastUpdatedAt);
 
   const columns = [

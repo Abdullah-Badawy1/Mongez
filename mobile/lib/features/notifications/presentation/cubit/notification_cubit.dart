@@ -23,7 +23,11 @@ class NotificationCubit extends Cubit<NotificationState> {
 
   void startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetch());
+    // 5 s — dashboard moderation actions push notifications, but the
+    // mobile only sees them on the next poll. Tighter loop here is what
+    // makes "verify a worker on the dashboard" feel instant on the
+    // worker's phone.
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetch());
     _fetch();
   }
 
