@@ -518,6 +518,46 @@ class AdminUsersCSVView(APIView):
         return response
 
 
+class AdminCategoriesCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        denied = _require_admin(request)
+        if denied is not None:
+            return denied
+        response = _csv_response("categories.csv")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "name", "name_ar", "icon", "image",
+            "description", "description_ar",
+            "worker_count", "active_worker_count",
+        ])
+        # Category list is tiny (tens of rows). One small count query per
+        # row is fine and keeps the code readable — annotating across the
+        # free-text profession field would need a Subquery wrapper that
+        # earns nothing at this scale.
+        for c in ServiceCategory.objects.order_by("name").iterator(chunk_size=500):
+            worker_count = WorkerProfile.objects.filter(
+                profession__iexact=c.name,
+            ).count()
+            active_worker_count = WorkerProfile.objects.filter(
+                profession__iexact=c.name,
+                is_available=True,
+            ).count()
+            image_url = ""
+            if c.image:
+                try:
+                    image_url = request.build_absolute_uri(c.image.url)
+                except Exception:
+                    image_url = c.image.name
+            writer.writerow([
+                c.id, c.name, c.name_ar, c.icon, image_url,
+                c.description, c.description_ar,
+                worker_count, active_worker_count,
+            ])
+        return response
+
+
 class AdminPaymentsCSVView(APIView):
     permission_classes = [IsAuthenticated]
 

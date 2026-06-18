@@ -176,6 +176,7 @@ export const adminAPI = {
     workers: () => api.get('/admin/export/workers.csv', { responseType: 'blob' }),
     users: () => api.get('/admin/export/users.csv', { responseType: 'blob' }),
     payments: () => api.get('/admin/export/payments.csv', { responseType: 'blob' }),
+    categories: () => api.get('/admin/export/categories.csv', { responseType: 'blob' }),
   },
 };
 

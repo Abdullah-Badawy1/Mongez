@@ -16,4 +16,5 @@ urlpatterns = [
     path("admin/export/workers.csv", views.AdminWorkersCSVView.as_view(), name="admin-export-workers"),
     path("admin/export/users.csv", views.AdminUsersCSVView.as_view(), name="admin-export-users"),
     path("admin/export/payments.csv", views.AdminPaymentsCSVView.as_view(), name="admin-export-payments"),
+    path("admin/export/categories.csv", views.AdminCategoriesCSVView.as_view(), name="admin-export-categories"),
 ]

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { categoriesAPI, adminAPI } from '../../services/api';
 import { usePolling, useTimeAgo } from '../../hooks/usePolling';
+import ExportCsvButton from '../../components/admin/ExportCsvButton';
 
 const fetchCategories = () => categoriesAPI.list().then((res) => res.data || []);
 
@@ -98,6 +99,7 @@ const Categories = () => {
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={refresh} disabled={loading} title="Refresh now">
             <i className="bi bi-arrow-repeat"></i>
           </button>
+          <ExportCsvButton fetcher={adminAPI.exports.categories} filename="categories.csv" />
           <button className="btn d-flex align-items-center gap-2 px-4" style={{ background: '#10b981', color: '#fff', borderRadius: '10px', border: 'none' }} onClick={openAdd}>
             <i className="bi bi-plus-lg"></i> Add Category
           </button>
