@@ -1296,13 +1296,17 @@ def sidebar_nav():
     with st.sidebar:
         dark = st.session_state.theme == "dark"
         import base64
-        logo_path = r"C:\Users\ALAQSA\AppData\Local\Temp\opencode\service_analytics\logo app .jpeg"
-        with open(logo_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
+        logo_path = os.path.join(os.path.dirname(__file__), "logo app .jpeg")
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+        else:
+            b64 = None
         sub_color = "rgba(255,255,255,0.3)" if dark else "rgba(0,0,0,0.4)"
         st.markdown(f"""
         <div style="text-align:center; padding:8px 0 16px 0;">
-            <img src="data:image/jpeg;base64,{b64}" style="height:60px; width:auto; margin-bottom:8px;">
+            {f'<img src="data:image/jpeg;base64,{b64}" style="height:60px; width:auto; margin-bottom:8px;">' if b64 else ''}
+            <div style="font-weight:700; font-size:1.1rem; background:linear-gradient(135deg,#2ecc71,#3498db); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">Service Analytics</div>
             <div style="font-weight:700; font-size:1.1rem; background:linear-gradient(135deg,#2ecc71,#3498db); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">Service Analytics</div>
             <div style="font-size:0.7rem; color:{sub_color}; letter-spacing:0.5px;">
                 Intelligent Dashboard
