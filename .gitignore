@@ -44,3 +44,9 @@ mobile/.flutter-plugins-dependencies
 .idea/
 .vscode/*
 *.swp
+
+# Personal deployment notes (server IPs, domain, env values)
+DEPLOYMENT.md
+
+# Graduation thesis — kept out of this repo
+docs/graduation/
