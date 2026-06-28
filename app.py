@@ -912,7 +912,7 @@ def page_customer():
             y=[k for k, _ in ordered],
             x=[v for _, v in ordered],
             textposition="inside",
-            textinfo="value+percent initial",
+            textinfo="value+percent total",
             marker=dict(
                 color=colors[:len(ordered)],
                 line=dict(width=2, color="white")),
