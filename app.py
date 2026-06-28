@@ -905,14 +905,16 @@ def page_customer():
     st.markdown("<div class='section-title'>🧩 Order Funnel — تدفق الطلبات عبر المراحل</div>", unsafe_allow_html=True)
     funnel = ins.get("order_funnel")
     if funnel:
-        colors = ["#2ecc71", "#e74c3c", "#f39c12", "#3498db", "#95a5a6"][:len(funnel)]
+        priority = {"✅ Completed": 0, "🔄 In Progress": 1, "⏳ Pending": 2, "❌ Cancelled": 3, "🚫 Rejected": 4}
+        ordered = sorted(funnel.items(), key=lambda x: (priority.get(x[0], 99), -x[1]))
+        colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#95a5a6"]
         fig = go.Figure(go.Funnel(
-            y=list(funnel.keys()),
-            x=list(funnel.values()),
+            y=[k for k, _ in ordered],
+            x=[v for _, v in ordered],
             textposition="inside",
             textinfo="value+percent initial",
             marker=dict(
-                color=colors,
+                color=colors[:len(ordered)],
                 line=dict(width=2, color="white")),
         ))
         fig.update_layout(title="Order Funnel",
