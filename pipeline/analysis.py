@@ -90,7 +90,8 @@ def exec_insights(dfs: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
         gov = _c(users, "governorate")
         role = _c(users, "role")
         if gov and role:
-            prov = users.groupby([gov, role]).size().unstack(fill_value=0).reset_index()
+            u = users[users[role].str.lower() != "admin"]
+            prov = u.groupby([gov, role]).size().unstack(fill_value=0).reset_index()
             prov.columns.name = None
             prov["Total"] = prov.iloc[:, 1:].sum(axis=1)
             col_map = {}
