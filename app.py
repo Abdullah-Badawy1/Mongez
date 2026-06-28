@@ -1134,30 +1134,45 @@ def page_ml():
     # ── Recommendations ──
     recs = ml.pop("recommendations", [])
     if recs:
-        st.markdown("<div class='section-title'>💡 Smart Recommendations — توصيات ذكية مبنية على البيانات</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title'>🧠 AI-Powered Recommendations — توصيات ذكية</div>", unsafe_allow_html=True)
         st.caption("مصنفة حسب الأولوية • 🔴 عالية • 🟡 متوسطة • 🟢 منخفضة")
-        icon_map = {"expansion": "📍", "workforce": "👷", "revenue": "💰",
-                     "retention": "👥", "risk": "⚠️", "assignment": "🎯",
-                     "future_demand": "📈", "advisor": "🧠"}
+
+        type_info = {
+            "expansion":     ("📍", "التوسع الجغرافي", "Where Should We Expand?"),
+            "workforce":     ("👷", "تخطيط القوى العاملة", "Workforce Planning"),
+            "revenue":       ("💰", "فرص الربح", "Revenue Opportunity"),
+            "retention":     ("👥", "الاحتفاظ بالعملاء", "Customer Retention"),
+            "risk":          ("⚠️", "اكتشاف المخاطر", "Business Risk Detection"),
+            "assignment":    ("🎯", "تعيين العمال", "Best Worker Assignment"),
+            "future_demand": ("📈", "توقعات الطلب", "Future Demand Forecast"),
+            "advisor":       ("🧠", "المستشار الذكي", "AI Business Advisor"),
+        }
         badge_colors = {"high": "#e74c3c", "medium": "#f39c12", "low": "#2ecc71"}
-        badge_text = {"high": "🔴 High Priority", "medium": "🟡 Medium", "low": "🟢 Info"}
-        cols = st.columns(min(3, len(recs)))
-        for i, rec in enumerate(recs):
-            prio = rec.get("priority", "low")
-            icon = icon_map.get(rec.get("type", ""), "💡")
-            bc = badge_colors[prio]
-            bt = badge_text[prio]
-            with cols[i % 3]:
-                st.markdown(f"""
-                <div class="rec-card priority-{prio}">
-                    <div class="rec-icon">{icon}</div>
-                    <span class="rec-badge" style="background:{bc}20; color:{bc}; border:1px solid {bc}40;">
-                        {bt}
-                    </span>
-                    <div class="rec-title">{rec.get("title","")}</div>
-                    <div class="rec-detail">{rec.get("detail","")}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        badge_text = {"high": "🔴 عالية", "medium": "🟡 متوسطة", "low": "🟢 منخفضة"}
+        order = ["expansion", "workforce", "revenue", "retention", "risk", "assignment", "future_demand", "advisor"]
+
+        for t in order:
+            group = [r for r in recs if r.get("type") == t]
+            if not group:
+                continue
+            icon, ar_title, en_title = type_info.get(t, ("💡", "", ""))
+            with st.expander(f"{icon} **{ar_title}** — {en_title}  ‏({len(group)})", expanded=(t in ("risk", "advisor"))):
+                inner_cols = st.columns(min(3, len(group)))
+                for j, rec in enumerate(group):
+                    prio = rec.get("priority", "low")
+                    bc = badge_colors[prio]
+                    bt = badge_text[prio]
+                    with inner_cols[j % 3]:
+                        st.markdown(f"""
+                        <div class="rec-card priority-{prio}">
+                            <div class="rec-icon">{icon}</div>
+                            <span class="rec-badge" style="background:{bc}20; color:{bc}; border:1px solid {bc}40;">
+                                {bt}
+                            </span>
+                            <div class="rec-title">{rec.get("title","")}</div>
+                            <div class="rec-detail">{rec.get("detail","")}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
     # ── Helper ──
     def _show_base_metrics(res, icon):
