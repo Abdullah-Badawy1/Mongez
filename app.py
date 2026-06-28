@@ -903,7 +903,7 @@ def page_customer():
 
     # ── 1. Order Funnel ──
     st.markdown("<div class='section-title'>🧩 Order Funnel — تدفق الطلبات عبر المراحل</div>", unsafe_allow_html=True)
-    funnel = ins.get("order_funnel")
+    funnel = ins.get("process_pie")
     if funnel:
         priority = {"✅ Completed": 0, "🔄 In Progress": 1, "⏳ Pending": 2, "❌ Cancelled": 3, "🚫 Rejected": 4}
         ordered = sorted(funnel.items(), key=lambda x: (priority.get(x[0], 99), -x[1]))
