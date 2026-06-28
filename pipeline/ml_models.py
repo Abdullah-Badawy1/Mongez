@@ -369,118 +369,213 @@ def _worker_clustering(dfs):
 
 def generate_recommendations(dfs, ml_results):
     recs = []
+
+    # ── 1. 📍 Where Should We Expand? ──
+    try:
+        geo = geographic_opportunity(dfs)
+        if geo:
+            for g in sorted(geo, key=lambda x: x["gap"], reverse=True)[:5]:
+                if g["gap"] <= 0:
+                    continue
+                recs.append({
+                    "type": "expansion",
+                    "title": f"📍 توسع في {g['governorate']}",
+                    "detail": f"الفجوة: {g['gap']} طلب غير مخدوم. {g['workers']} عامل فقط مقابل {g['demand']} طلب. افتح فرع أو وفّر عمال.",
+                    "priority": "high" if g["gap"] > 50 else "medium",
+                })
+    except Exception:
+        pass
+
+    # ── 2. 👷 Workforce Planning ──
     try:
         o = dfs.get("orders")
         w = dfs.get("workers")
-        r = dfs.get("ratings")
-        u = dfs.get("users")
-        cat = dfs.get("categories")
-        o = o if o is not None and len(o) else None
-        w = w if w is not None and len(w) else None
-
         if o is not None and w is not None:
             prof_c = _c(w, "profession")
+            wg = _c(w, "governorate")
             cat_c = _c(o, "category")
             if prof_c and cat_c:
-                supply = w[prof_c].value_counts()
                 demand = o[cat_c].value_counts()
-                all_svc = sorted(set(list(supply.index) + list(demand.index)))
-                for svc in all_svc:
-                    s = supply.get(svc, 0)
+                supply = w[prof_c].value_counts()
+                for svc in sorted(set(list(supply.index) + list(demand.index))):
                     d = demand.get(svc, 0)
-                    if s > 0 and d / s > 5:
-                        needed = int(d / 4 - s)
+                    s = supply.get(svc, 0)
+                    if d > 0 and (s == 0 or d / s > 4):
+                        needed = max(1, int(d / 3 - s))
+                        gov_detail = ""
+                        if wg and svc in w[prof_c].values:
+                            w_gov = w[w[prof_c] == svc][wg].value_counts()
+                            if len(w_gov):
+                                gov_detail = f" في {w_gov.idxmax()}"
                         recs.append({
-                            "type": "Supply Gap",
-                            "title": f"زيادة عمال في {svc}",
-                            "detail": f"{d} طلب مقابل {s} عامل ({d//s:.0f}x). محتاج ~{max(needed,1)} عامل إضافي.",
-                            "priority": "high" if d / s > 8 else "medium"
+                            "type": "workforce",
+                            "title": f"👷 احتياج: {svc}",
+                            "detail": f"مطلوب ~{needed} عامل{gov_detail}. الطلب {d} مقابل {s} عامل فقط.",
+                            "priority": "high" if d / s > 6 else "medium",
                         })
-                    elif s > 0 and d / s < 1.5:
+    except Exception:
+        pass
+
+    # ── 3. 💰 Revenue Opportunity ──
+    try:
+        o = dfs.get("orders")
+        if o is not None and len(o) >= 5:
+            cat_c = _c(o, "category")
+            cm = _c(o, "commission")
+            if cat_c and cm:
+                svc_comm = o.groupby(cat_c)[cm].agg(["mean", "count"]).reset_index()
+                svc_comm.columns = [cat_c, "avg_commission", "order_count"]
+                oa = svc_comm["avg_commission"].mean()
+                for _, row in svc_comm.iterrows():
+                    svc = row[cat_c]
+                    if row["avg_commission"] > oa * 1.2 and row["order_count"] >= 5:
                         recs.append({
-                            "type": "Over-Supply",
-                            "title": f"{svc} — العمال كافيين",
-                            "detail": f"{d} طلب فقط لـ {s} عامل — توازن جيد.",
-                            "priority": "low"
+                            "type": "revenue",
+                            "title": f"💰 {svc} — فرصة ربح عالية",
+                            "detail": f"متوسط العمولة {row['avg_commission']:.0f} EGP أعلى من المتوسط ({oa:.0f} EGP). ركّز على تسويقها.",
+                            "priority": "medium",
                         })
-
-        wr = ml_results.get("worker_recommender")
-        if wr:
-            records = wr.get("records", [])
-            if records:
-                svc_groups = {}
-                for r_ in records:
-                    p = r_.get("profession", "")
-                    if p not in svc_groups:
-                        svc_groups[p] = []
-                    svc_groups[p].append(r_)
-                for svc, workers_list in svc_groups.items():
-                    if len(workers_list) >= 3:
-                        top3 = workers_list[:3]
-                        names = [w_.get("name", w_.get("username", "?")) for w_ in top3]
+                    elif row["avg_commission"] < oa * 0.7 and row["order_count"] >= 5:
                         recs.append({
-                            "type": "Top Workers",
-                            "title": f"أفضل عمال في {svc}",
-                            "detail": f"1. {names[0]} | 2. {names[1]} | 3. {names[2]}",
-                            "priority": "low"
+                            "type": "revenue",
+                            "title": f"💰 {svc} — يمكن تحسين الأسعار",
+                            "detail": f"متوسط العمولة {row['avg_commission']:.0f} EGP أقل من المتوسط ({oa:.0f} EGP). راجع التسعير.",
+                            "priority": "low",
                         })
+    except Exception:
+        pass
 
-        cc = ml_results.get("completion_classifier")
-        if cc:
-            fi = cc.get("fi", {})
-            top_feat = max(fi, key=fi.get) if fi else None
-            if top_feat:
-                recs.append({
-                    "type": "Completion Insight",
-                    "title": f"أهم عامل لإتمام الطلب: {top_feat}",
-                    "detail": f"تأثير الميزة: {fi[top_feat]:.0%}. الطلبات ذات {top_feat} المنخفض عرضة للإلغاء.",
-                    "priority": "medium"
-                })
-
+    # ── 4. 👥 Customer Retention ──
+    try:
         ch = ml_results.get("churn_predictor")
         if ch:
             acc = ch.get("accuracy", 0)
             recs.append({
-                "type": "Client Retention",
-                "title": f"نموذج ولاء العملاء دقته {acc:.0%}",
-                "detail": "العملاء ذوو نسبة إلغاء عالية وإنفاق قليل لا يعودون. قدّم خصومات للمحافظة عليهم.",
-                "priority": "medium"
+                "type": "retention",
+                "title": "👥 عملاء معرضون للخسارة",
+                "detail": f"نموذج الولاء بدقة {acc:.0%}. العملاء قليلو الطلب ومرتفعو الإلغاء الأكثر عرضة للترك. قدّم خصومات وعروض.",
+                "priority": "high",
             })
+    except Exception:
+        pass
 
-        wc = ml_results.get("worker_clustering")
-        if wc:
-            cents = wc.get("centroids", [])
-            if len(cents) >= 3:
-                worst = cents[-1]
-                worst_label = worst.get("label", "المجموعة الأقل")
+    # ── 5. ⚠️ Business Risk Detection ──
+    try:
+        o = dfs.get("orders")
+        r = dfs.get("ratings")
+        if o is not None and len(o):
+            st = _c(o, "status")
+            if st:
+                cancel_rate = (o[st].str.upper() == "CANCELLED").sum() / len(o) * 100
+                if cancel_rate > 20:
+                    recs.append({
+                        "type": "risk",
+                        "title": "⚠️ ارتفاع معدل الإلغاء",
+                        "detail": f"نسبة الإلغاء {cancel_rate:.0f}% — فوق الحد الآمن (20%). راجع الأسباب.",
+                        "priority": "high",
+                    })
+        if r is not None and len(r):
+            star = _c(r, "stars")
+            if star and r[star].mean() < 3.5:
                 recs.append({
-                    "type": "Worker Segments",
-                    "title": f"{worst_label} محتاجة اهتمام",
-                    "detail": f"تشمل {wc.get('workers',0)} عامل. يفضل تدريب أو مراجعة الأسعار أو الجودة.",
-                    "priority": "medium"
+                    "type": "risk",
+                    "title": "⚠️ انخفاض تقييم العملاء",
+                    "detail": f"متوسط التقييم {r[star].mean():.2f}/5 — أقل من المستهدف (4.0). حسّن الجودة.",
+                    "priority": "high",
                 })
-
         if o is not None:
             cat_c = _c(o, "category")
-            cm = _c(o, "commission")
-            if cat_c and cm:
-                svc_comm = o.groupby(cat_c)[cm].agg(["mean", "min", "max"]).reset_index()
-                svc_comm.columns = [cat_c, "avg", "min", "max"]
-                for _, row in svc_comm.iterrows():
-                    svc = row[cat_c]
-                    if row["avg"] > svc_comm["avg"].quantile(0.75):
-                        recs.append({
-                            "type": "Pricing Insight",
-                            "title": f"{svc}: متوسط العمولة {row['avg']:.0f} EGP",
-                            "detail": f"المدى: {row['min']:.0f} - {row['max']:.0f} EGP. خدمة ذات هامش ربح عالٍ.",
-                            "priority": "low"
-                        })
-
-        prio_map = {"high": 0, "medium": 1, "low": 2}
-        recs.sort(key=lambda x: prio_map.get(x.get("priority", "low"), 2))
-        return recs[:20]
+            st = _c(o, "status")
+            if cat_c and st:
+                per_cat = o.groupby(cat_c)[st].apply(
+                    lambda x: (x.str.upper() == "CANCELLED").sum() / len(x) * 100
+                ).reset_index()
+                for _, row in per_cat[per_cat.iloc[:, 1] > 25].iterrows():
+                    recs.append({
+                        "type": "risk",
+                        "title": f"⚠️ {row.iloc[0]}: إلغاء {row.iloc[1]:.0f}%",
+                        "detail": "نسبة إلغاء مرتفعة. راجع جودة العمال في هذه الخدمة.",
+                        "priority": "high",
+                    })
     except Exception:
-        return []
+        pass
+
+    # ── 6. 🎯 Best Worker Assignment ──
+    try:
+        o = dfs.get("orders")
+        w = dfs.get("workers")
+        if o is not None and w is not None:
+            prof_c = _c(w, "profession")
+            cat_c = _c(o, "category")
+            ar = _c(w, "average_rating")
+            nm = _c(w, "name")
+            un = _c(w, "username")
+            if prof_c and cat_c and ar:
+                for svc in o[cat_c].value_counts().head(5).index:
+                    svc_w = w[w[prof_c] == svc] if svc in w[prof_c].values else None
+                    if svc_w is not None and len(svc_w) >= 3:
+                        top = svc_w.nlargest(3, ar)
+                        names = [f"{row.get(nm) or row.get(un, '?')} ({row[ar]:.1f})" for _, row in top.iterrows()]
+                        recs.append({
+                            "type": "assignment",
+                            "title": f"🎯 أفضل عمال لـ {svc}",
+                            "detail": f"1. {names[0]} | 2. {names[1]} | 3. {names[2]} — اخترهم لزيادة نسبة الإتمام.",
+                            "priority": "low",
+                        })
+    except Exception:
+        pass
+
+    # ── 7. 📈 Future Demand Forecast ──
+    try:
+        fc = demand_forecast(dfs)
+        if fc:
+            for f in [x for x in fc if x.get("direction") == "up"][:5]:
+                recs.append({
+                    "type": "future_demand",
+                    "title": f"📈 طلب متزايد: {f['service']}",
+                    "detail": f"متوقع {f['predicted']} طلب الشهر القادم (حالياً {f['current']}). وفّر عمال كافيين.",
+                    "priority": "medium",
+                })
+            for f in [x for x in fc if x.get("direction") == "down"][:3]:
+                recs.append({
+                    "type": "future_demand",
+                    "title": f"📉 طلب متناقص: {f['service']}",
+                    "detail": f"متوقع {f['predicted']} طلب (حالياً {f['current']}). قلّل عدد العمال في هذه الخدمة.",
+                    "priority": "low",
+                })
+    except Exception:
+        pass
+
+    # ── 8. 🧠 AI Business Advisor ──
+    try:
+        insights = []
+        ch = ml_results.get("churn_predictor")
+        if ch and ch.get("accuracy", 0) > 0.8:
+            insights.append("نموذج ولاء العملاء دقيق ويمكن الاعتماد عليه")
+        cc = ml_results.get("completion_classifier")
+        if cc and cc.get("accuracy", 0) > 0.65:
+            insights.append("نموذج إتمام الطلب جيد — استخدم أهم الميزات لتحسين الإتمام")
+        wr = ml_results.get("worker_recommender")
+        if wr:
+            insights.append(f"تم تقييم {wr.get('workers_scored',0)} عامل عبر {wr.get('professions',0)} مهنة")
+        models_ran = sum(1 for k in ["commission_predictor", "completion_classifier", "churn_predictor", "worker_recommender"] if k in ml_results)
+        if models_ran >= 3:
+            insights.append(f"✅ {models_ran}/4 نماذج رئيسية تعمل بكفاءة")
+        else:
+            insights.append(f"⚠️ {models_ran}/4 نماذج رئيسية فقط — زد حجم البيانات")
+        if insights:
+            recs.append({
+                "type": "advisor",
+                "title": "🧠 ملخص المستشار الذكي",
+                "detail": " • ".join(insights),
+                "priority": "medium",
+            })
+    except Exception:
+        pass
+
+    prio_map = {"high": 0, "medium": 1, "low": 2}
+    recs.sort(key=lambda x: prio_map.get(x.get("priority", "low"), 2))
+    return recs[:25]
 
 
 def demand_forecast(dfs):

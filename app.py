@@ -1136,9 +1136,9 @@ def page_ml():
     if recs:
         st.markdown("<div class='section-title'>💡 Smart Recommendations — توصيات ذكية مبنية على البيانات</div>", unsafe_allow_html=True)
         st.caption("مصنفة حسب الأولوية • 🔴 عالية • 🟡 متوسطة • 🟢 منخفضة")
-        icon_map = {"Supply Gap": "⚠️", "Over-Supply": "✅", "Top Workers": "🏆",
-                     "Completion Insight": "🎯", "Client Retention": "🔄",
-                     "Worker Segments": "📊", "Pricing Insight": "💰"}
+        icon_map = {"expansion": "📍", "workforce": "👷", "revenue": "💰",
+                     "retention": "👥", "risk": "⚠️", "assignment": "🎯",
+                     "future_demand": "📈", "advisor": "🧠"}
         badge_colors = {"high": "#e74c3c", "medium": "#f39c12", "low": "#2ecc71"}
         badge_text = {"high": "🔴 High Priority", "medium": "🟡 Medium", "low": "🟢 Info"}
         cols = st.columns(min(3, len(recs)))
