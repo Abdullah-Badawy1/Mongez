@@ -512,18 +512,18 @@ def generate_recommendations(dfs, ml_results):
         insights = []
         ch = ml_results.get("churn_predictor")
         if ch and ch.get("accuracy", 0) > 0.8:
-            insights.append("نموذج ولاء العملاء دقيق ويمكن الاعتماد عليه")
+            insights.append("Churn model is reliable (accuracy > 80%) — use it to target retention campaigns")
         cc = ml_results.get("completion_classifier")
         if cc and cc.get("accuracy", 0) > 0.65:
-            insights.append("نموذج إتمام الطلب جيد — استخدم أهم الميزات لتحسين الإتمام")
+            insights.append("Completion model shows which features drive order success — focus on top predictors")
         wr = ml_results.get("worker_recommender")
         if wr:
-            insights.append(f"تم تقييم {wr.get('workers_scored',0)} عامل عبر {wr.get('professions',0)} مهنة")
+            insights.append(f"Scored {wr.get('workers_scored',0)} workers across {wr.get('professions',0)} professions")
         models_ran = sum(1 for k in ["commission_predictor", "completion_classifier", "churn_predictor", "worker_recommender"] if k in ml_results)
         if models_ran >= 3:
-            insights.append(f"✅ {models_ran}/4 نماذج رئيسية تعمل بكفاءة")
+            insights.append(f"✅ {models_ran}/4 primary models operational")
         else:
-            insights.append(f"⚠️ {models_ran}/4 نماذج رئيسية فقط — زد حجم البيانات")
+            insights.append(f"⚠️ Only {models_ran}/4 models active — increase data volume for better coverage")
         if insights:
             recs.append({
                 "type": "advisor",
