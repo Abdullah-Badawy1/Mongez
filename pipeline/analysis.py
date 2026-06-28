@@ -439,7 +439,7 @@ def customer_insights(dfs: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
     users = dfs.get("users")
     ratings = dfs.get("ratings")
 
-    # ── 1. Order Funnel / Status Distribution ──
+    # ── 1. Order Funnel ──
     if orders is not None and len(orders):
         st = _c(orders, "status")
         if st:
@@ -453,13 +453,6 @@ def customer_insights(dfs: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
             for k, v in counts.items():
                 funnel[labels_map.get(k.lower(), k.title())] = int(v)
             ins["order_funnel"] = funnel
-            # status distribution (same data, without rejected)
-            pie_labels = {"completed": "✅ Completed", "cancelled": "❌ Cancelled",
-                          "pending": "⏳ Pending", "in_progress": "🔄 In Progress"}
-            pie = {}
-            for k, v in counts.items():
-                pie[pie_labels.get(k.lower(), k.title())] = int(v)
-            ins["process_pie"] = pie
 
     # ── 2. Customer Segmentation ──
     if orders is not None and len(orders) and users is not None:
